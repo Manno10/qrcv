@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0B3D2E">
+<title>Scan ELMS — Suivi convois</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230B3D2E'/><text y='68' x='50' font-size='58' text-anchor='middle' fill='%23F0C808'>◎</text></svg>">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --vert:#0B3D2E; --vert-clair:#14624A; --or:#F0C808;
+    --route:#2E7DD1; --ok:#1DA96B; --alerte:#E4572E;
+    --fond:#0A1512; --carte:#0F211B; --texte:#EAF2EE; --gris:#7C8F88;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:'Segoe UI',system-ui,sans-serif;
+    background:var(--fond); color:var(--texte);
+    min-height:100vh; display:flex; flex-direction:column;
+    overscroll-behavior:none;
+  }
+  header{
+    background:var(--vert); padding:14px 18px;
+    display:flex; align-items:center; justify-content:space-between;
+    border-bottom:2px solid var(--or);
+  }
+  header .titre{font-size:1.05rem; font-weight:700; letter-spacing:.3px}
+  header .titre span{color:var(--or)}
+  #reseau{
+    font-size:.72rem; font-weight:600; padding:4px 10px; border-radius:20px;
+    display:flex; align-items:center; gap:5px;
+  }
+  #reseau.on{background:rgba(29,169,107,.18); color:var(--ok)}
+  #reseau.off{background:rgba(228,87,46,.18); color:var(--alerte)}
+  #reseau::before{content:''; width:7px; height:7px; border-radius:50%; background:currentColor}
+
+  main{flex:1; padding:16px; display:flex; flex-direction:column; gap:16px; max-width:520px; margin:0 auto; width:100%}
+
+  .phase-select{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .phase-btn{
+    padding:16px 10px; border:2px solid var(--vert-clair); border-radius:14px;
+    background:var(--carte); color:var(--gris); font-size:1rem; font-weight:700;
+    cursor:pointer; transition:.15s; display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+  .phase-btn .ico{font-size:1.5rem}
+  .phase-btn.actif[data-phase="depart"]{border-color:var(--route); color:#fff; background:rgba(46,125,209,.15)}
+  .phase-btn.actif[data-phase="arrivee"]{border-color:var(--ok); color:#fff; background:rgba(29,169,107,.15)}
+
+  #lecteur{
+    border-radius:16px; overflow:hidden; background:#000;
+    border:2px solid var(--vert-clair); min-height:220px;
+  }
+  #lecteur video{border-radius:14px}
+
+  .gps-ligne{
+    display:flex; align-items:center; gap:8px; font-size:.8rem; color:var(--gris);
+    background:var(--carte); padding:10px 14px; border-radius:10px;
+  }
+  .gps-ligne strong{color:var(--texte); font-variant-numeric:tabular-nums}
+  .gps-ligne .pastille{width:8px;height:8px;border-radius:50%;background:var(--alerte)}
+  .gps-ligne.fix .pastille{background:var(--ok)}
+
+  .scan-ctrl{display:flex; gap:10px}
+  .btn{
+    flex:1; padding:15px; border:none; border-radius:14px; font-size:1rem; font-weight:700;
+    cursor:pointer; transition:.15s; color:#fff;
+  }
+  .btn.primaire{background:var(--or); color:var(--vert)}
+  .btn.stop{background:var(--vert-clair)}
+  .btn:active{transform:scale(.97)}
+  .btn:disabled{opacity:.4}
+
+  .file{
+    background:var(--carte); border-radius:14px; padding:14px; border:1px solid var(--vert-clair);
+  }
+  .file h3{font-size:.82rem; color:var(--gris); font-weight:600; margin-bottom:10px; display:flex; justify-content:space-between}
+  .file h3 b{color:var(--or)}
+  .item{
+    display:flex; align-items:center; gap:10px; padding:9px 0;
+    border-top:1px solid rgba(255,255,255,.05); font-size:.85rem;
+  }
+  .item:first-of-type{border-top:none}
+  .item .badge{font-size:.68rem; font-weight:700; padding:3px 8px; border-radius:6px; white-space:nowrap}
+  .badge.depart{background:rgba(46,125,209,.2); color:var(--route)}
+  .badge.arrivee{background:rgba(29,169,107,.2); color:var(--ok)}
+  .badge.attente{background:rgba(240,200,8,.15); color:var(--or)}
+  .item .code{font-weight:700; flex:1}
+  .item .meta{color:var(--gris); font-size:.72rem}
+  .vide{color:var(--gris); font-size:.82rem; text-align:center; padding:8px 0}
+
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(120px);
+    background:var(--vert-clair); color:#fff; padding:13px 20px; border-radius:12px;
+    font-size:.9rem; font-weight:600; box-shadow:0 8px 30px rgba(0,0,0,.5);
+    transition:transform .3s; z-index:50; max-width:90%; text-align:center;
+  }
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .toast.ok{background:var(--ok)} .toast.err{background:var(--alerte)} .toast.warn{background:var(--or); color:var(--vert)}
+</style>
+</head>
+<body>
+<header>
+  <div class="titre">Scan <span>ELMS</span> · Convois</div>
+  <div id="reseau" class="on">en ligne</div>
+</header>
+
+<main>
+  <div class="phase-select">
+    <button class="phase-btn actif" data-phase="depart" onclick="setPhase('depart')">
+      <span class="ico">↑</span>Départ
+    </button>
+    <button class="phase-btn" data-phase="arrivee" onclick="setPhase('arrivee')">
+      <span class="ico">◎</span>Arrivée
+    </button>
+  </div>
+
+  <div id="lecteur"></div>
+
+  <div class="gps-ligne" id="gpsBox">
+    <span class="pastille"></span>
+    <span>Position :</span>
+    <strong id="gpsTxt">recherche…</strong>
+  </div>
+
+  <div class="scan-ctrl">
+    <button class="btn primaire" id="btnScan" onclick="demarrerScan()">Démarrer le scan</button>
+    <button class="btn stop" id="btnStop" onclick="arreterScan()" disabled>Arrêter</button>
+  </div>
+
+  <div class="file">
+    <h3>File d'attente <b id="fileCount">0 en attente</b></h3>
+    <div id="fileListe"><div class="vide">Aucun scan pour l'instant</div></div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ CONFIGURATION ============
+// URL /exec du déploiement Apps Script "scan_elms" (spreadsheet 1tU2Lvx...)
+const URL_APPS_SCRIPT = 'https://script.google.com/macros/s/TON_ID_SCAN/exec';
+const CONVOI = '';   // pré-remplir si l'appareil est dédié à un convoi (ex: 'C-ARTIBONITE-1')
+const AGENT  = '';   // pré-remplir le nom de l'agent si souhaité
+
+// ============ ÉTAT ============
+let phase = 'depart';
+let position = null;      // {lat, lng, acc}
+let scanner = null;
+let enScan = false;
+const CLE_FILE = 'elms_file_attente';
+
+// ============ GÉOLOCALISATION CONTINUE ============
+function suivreGPS(){
+  if(!navigator.geolocation){ maj('gpsTxt','GPS indisponible'); return; }
+  navigator.geolocation.watchPosition(
+    p=>{
+      position = {lat:p.coords.latitude, lng:p.coords.longitude, acc:Math.round(p.coords.accuracy)};
+      document.getElementById('gpsBox').classList.add('fix');
+      maj('gpsTxt', `${position.lat.toFixed(5)}, ${position.lng.toFixed(5)} · ±${position.acc} m`);
+    },
+    ()=>{ maj('gpsTxt','autorisation refusée'); document.getElementById('gpsBox').classList.remove('fix'); },
+    {enableHighAccuracy:true, maximumAge:3000, timeout:15000}
+  );
+}
+
+// ============ PHASE ============
+function setPhase(p){
+  phase = p;
+  document.querySelectorAll('.phase-btn').forEach(b=>b.classList.toggle('actif', b.dataset.phase===p));
+}
+
+// ============ SCAN QR ============
+function demarrerScan(){
+  if(enScan) return;
+  scanner = new Html5Qrcode('lecteur');
+  scanner.start(
+    {facingMode:'environment'},
+    {fps:10, qrbox:{width:220, height:220}},
+    onScan,
+    ()=>{}
+  ).then(()=>{
+    enScan = true;
+    document.getElementById('btnScan').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+  }).catch(e=>toast('Caméra inaccessible','err'));
+}
+
+function arreterScan(){
+  if(!scanner || !enScan) return;
+  scanner.stop().then(()=>{
+    scanner.clear(); enScan=false;
+    document.getElementById('btnScan').disabled=false;
+    document.getElementById('btnStop').disabled=true;
+  });
+}
+
+let dernierScan = 0;
+function onScan(texte){
+  const maintenant = Date.now();
+  if(maintenant - dernierScan < 2500) return;   // anti-rebond
+  dernierScan = maintenant;
+
+  const code = texte.trim();
+  if(!position){ toast('Position GPS non fixée — patiente','warn'); return; }
+
+  const scan = {
+    code_centre: code,
+    phase: phase,
+    convoi: CONVOI,
+    agent: AGENT,
+    lat: position.lat,
+    lng: position.lng,
+    acc: position.acc,
+    timestamp: new Date().toISOString()
+  };
+
+  if(navigator.vibrate) navigator.vibrate(120);
+  ajouterFile(scan);
+  envoyerFile();
+  toast(`${phase==='depart'?'Départ':'Arrivée'} · centre ${code}`, 'ok');
+}
+
+// ============ FILE D'ATTENTE OFFLINE ============
+function lireFile(){ try{ return JSON.parse(localStorage.getItem(CLE_FILE))||[]; }catch{ return []; } }
+function ecrireFile(f){ localStorage.setItem(CLE_FILE, JSON.stringify(f)); rendreFile(); }
+
+function ajouterFile(scan){
+  const f = lireFile();
+  scan._id = Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  scan._envoye = false;
+  f.push(scan);
+  ecrireFile(f);
+}
+
+async function envoyerFile(){
+  if(!navigator.onLine) return;
+  const f = lireFile();
+  const attente = f.filter(s=>!s._envoye);
+  for(const scan of attente){
+    try{
+      // no-cors : Apps Script accepte le POST, réponse opaque (on suppose OK si pas d'erreur réseau)
+      await fetch(URL_APPS_SCRIPT, {
+        method:'POST',
+        mode:'no-cors',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify(scan)
+      });
+      scan._envoye = true;
+    }catch(e){ /* reste en file, réessai au prochain cycle */ }
+  }
+  // purge les envoyés de plus de 5 min pour garder l'historique récent visible
+  const seuil = Date.now() - 5*60*1000;
+  ecrireFile(f.filter(s=>!s._envoye || parseInt(s._id) > seuil));
+}
+
+function rendreFile(){
+  const f = lireFile();
+  const nb = f.filter(s=>!s._envoye).length;
+  document.getElementById('fileCount').textContent = nb+' en attente';
+  const box = document.getElementById('fileListe');
+  if(f.length===0){ box.innerHTML='<div class="vide">Aucun scan pour l\'instant</div>'; return; }
+  box.innerHTML = f.slice(-8).reverse().map(s=>{
+    const badge = s._envoye ? `<span class="badge ${s.phase}">${s.phase==='depart'?'Départ':'Arrivée'}</span>`
+                            : `<span class="badge attente">⏳ file</span>`;
+    const h = new Date(s.timestamp).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    return `<div class="item">${badge}<span class="code">${s.code_centre}</span><span class="meta">${h}</span></div>`;
+  }).join('');
+}
+
+// ============ RÉSEAU ============
+function majReseau(){
+  const el = document.getElementById('reseau');
+  if(navigator.onLine){ el.className='on'; el.textContent='en ligne'; envoyerFile(); }
+  else{ el.className='off'; el.textContent='hors ligne'; }
+}
+window.addEventListener('online', majReseau);
+window.addEventListener('offline', majReseau);
+
+// ============ UTILITAIRES ============
+function maj(id,txt){ document.getElementById(id).textContent = txt; }
+let toastTimer;
+function toast(msg,type=''){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show '+type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.className='toast '+type, 2600);
+}
+
+// ============ INIT ============
+suivreGPS();
+majReseau();
+rendreFile();
+setInterval(envoyerFile, 20000);   // tentative de renvoi périodique
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+</script>
+</body>
+</html>
