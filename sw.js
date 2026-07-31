@@ -1,45 +1,66 @@
-// Service worker — v2 (bump pour forcer le rechargement après mise à jour URL)
-const CACHE = 'elms-scan-v2';
-const FICHIERS = [
+// Scan ELMS — service worker v4
+const CACHE = 'elms-scan-v4';
+const LOCAUX = [
   './',
   './index.html',
   './manifest.json',
-  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js'
+  './icon-192.png',
+  './icon-512.png',
+  './icon-maskable-512.png'
 ];
 
-// Installation : mise en cache + activation immédiate
-self.addEventListener('install', e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FICHIERS)));
-  self.skipWaiting();   // active la nouvelle version sans attendre
-});
-
-// Activation : suppression de TOUS les anciens caches
-self.addEventListener('activate', e=>{
-  e.waitUntil(
-    caches.keys().then(cles=>
-      Promise.all(cles.filter(k=>k!==CACHE).map(k=>caches.delete(k)))
-    ).then(()=>self.clients.claim())
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(cache => cache.addAll(LOCAUX))
+      .then(() => self.skipWaiting())
   );
 });
 
-// Récupération : réseau d'abord pour le HTML (toujours la dernière version),
-// cache d'abord pour le reste. Jamais les appels Apps Script.
-self.addEventListener('fetch', e=>{
-  const url = e.request.url;
-  if(url.includes('script.google.com')) return;   // scans : jamais en cache
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(key => key !== CACHE).map(key => caches.delete(key))
+      ))
+      .then(() => self.clients.claim())
+  );
+});
 
-  // Le HTML est servi réseau-d'abord pour éviter tout cache figé
-  if(e.request.mode === 'navigate' || url.endsWith('index.html') || url.endsWith('/')){
-    e.respondWith(
-      fetch(e.request).then(rep=>{
-        const copie = rep.clone();
-        caches.open(CACHE).then(c=>c.put(e.request, copie));
-        return rep;
-      }).catch(()=>caches.match(e.request))   // hors ligne : on retombe sur le cache
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  const url = new URL(request.url);
+
+  // Ne jamais intercepter les appels vers Apps Script.
+  if (url.hostname === 'script.google.com' || url.hostname === 'script.googleusercontent.com') {
+    return;
+  }
+
+  // Navigation : réseau d'abord, cache en secours.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          const copie = response.clone();
+          caches.open(CACHE).then(cache => cache.put('./index.html', copie));
+          return response;
+        })
+        .catch(() => caches.match('./index.html'))
     );
     return;
   }
 
-  // Autres ressources : cache d'abord
-  e.respondWith(caches.match(e.request).then(rep=> rep || fetch(e.request)));
+  // Ressources locales et CDN : cache d'abord, réseau en secours.
+  event.respondWith(
+    caches.match(request).then(cached => {
+      if (cached) return cached;
+      return fetch(request).then(response => {
+        if (request.method === 'GET' && response && response.status === 200) {
+          const copie = response.clone();
+          caches.open(CACHE).then(cache => cache.put(request, copie));
+        }
+        return response;
+      });
+    })
+  );
 });
