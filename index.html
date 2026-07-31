@@ -1,176 +1,1625 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#0F2742">
-<title>Scan SGLE — Départ / Arrivée</title>
-<link rel="manifest" href="manifest.json">
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SUVI DES CONVOIS — Livraison et récupération 2026</title>
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@600;700;800&family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
+/* ============================================================
+   POSTE DE COMMANDEMENT — direction esthétique
+   Salle op · grand écran · monitoring temps réel
+   Palette sombre profonde, hiérarchie d'alerte stricte.
+   ============================================================ */
 :root{
-  --navy:#0F2742; --navy2:#173A61; --blue:#1769E0; --blueSoft:#EAF2FF;
-  --orange:#E56A00; --orangeSoft:#FFF1E5; --green:#14885C; --greenSoft:#E8F7F1;
-  --red:#C53A3A; --yellow:#E3A700; --bg:#F3F6FA; --card:#FFFFFF;
-  --text:#172333; --muted:#66758A; --line:#DDE5EF; --shadow:0 12px 32px rgba(15,39,66,.12);
+  /* fond — bleu-nuit profond, non générique */
+  --void:#070b14;
+  --panel:#0c1220;
+  --panel-2:#101827;
+  --panel-3:#161f31;
+  --raised:#1a2438;
+  --line:#1f2b40;
+  --line-2:#2a3a54;
+  --line-glow:#324867;
+
+  /* texte */
+  --ink:#e8eef7;
+  --ink-2:#9fb0c8;
+  --ink-3:#647389;
+  --ink-faint:#42506a;
+
+  /* accents — un seul bleu-signal froid pour l'état nominal */
+  --signal:#3d9bff;
+  --signal-2:#5fb2ff;
+  --signal-dim:rgba(61,155,255,.14);
+
+  /* états — spectre d'alerte discipliné */
+  --ok:#25d07d;
+  --ok-dim:rgba(37,208,125,.14);
+  --warn:#f5a524;
+  --warn-dim:rgba(245,165,36,.14);
+  --alert:#ff3b5c;
+  --alert-dim:rgba(255,59,92,.16);
+  --alert-glow:rgba(255,59,92,.45);
+  --return:#a06bff;
+  --return-dim:rgba(160,107,255,.14);
+
+  --r:14px;
+  --r-sm:9px;
+  --shadow:0 20px 60px rgba(0,0,0,.55);
+  --shadow-soft:0 8px 24px rgba(0,0,0,.35);
 }
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:Inter,"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-header{position:sticky;top:0;z-index:20;background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;padding:14px 16px;box-shadow:0 4px 16px rgba(15,39,66,.22)}
-.header-row{max-width:560px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
-.brand{display:flex;align-items:center;gap:11px}.logo{width:42px;height:42px;border-radius:12px;background:#fff;color:var(--navy);display:grid;place-items:center;font-weight:900}.title{font-weight:800;font-size:1.05rem}.subtitle{font-size:.72rem;opacity:.78;margin-top:2px}
-#reseau{font-size:.72rem;font-weight:800;padding:6px 10px;border-radius:999px;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.12)}
-#reseau::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}#reseau.on{color:#71F0B7}#reseau.off{color:#FF9A85}
-main{max-width:560px;margin:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--shadow)}
-.section-title{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:800;margin-bottom:11px}
-.instruction{font-size:.95rem;line-height:1.5;color:var(--text);margin-bottom:13px}.instruction b{color:var(--navy)}
-.phase-select{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.phase-btn{position:relative;min-height:132px;border:2px solid var(--line);border-radius:16px;background:#fff;padding:16px 12px;cursor:pointer;text-align:left;transition:.18s;display:flex;flex-direction:column;justify-content:space-between}
-.phase-btn:active{transform:scale(.98)}.phase-btn .icon{font-size:2rem}.phase-btn .name{font-size:1.08rem;font-weight:900;margin-top:8px}.phase-btn .desc{font-size:.76rem;color:var(--muted);line-height:1.35;margin-top:4px}.phase-btn .check{position:absolute;right:10px;top:10px;width:24px;height:24px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-weight:900;color:transparent}
-.phase-btn[data-phase="depart"] .name{color:var(--blue)}.phase-btn[data-phase="arrivee"] .name{color:var(--orange)}
-.phase-btn.actif[data-phase="depart"]{border-color:var(--blue);background:var(--blueSoft);box-shadow:0 0 0 4px rgba(23,105,224,.11)}
-.phase-btn.actif[data-phase="arrivee"]{border-color:var(--orange);background:var(--orangeSoft);box-shadow:0 0 0 4px rgba(229,106,0,.11)}
-.phase-btn.actif .check{color:#fff;border-color:transparent}.phase-btn.actif[data-phase="depart"] .check{background:var(--blue)}.phase-btn.actif[data-phase="arrivee"] .check{background:var(--orange)}
-.phase-banner{display:none;border-radius:14px;padding:13px 14px;font-weight:800;align-items:center;gap:10px}.phase-banner.show{display:flex}.phase-banner.depart{background:var(--blueSoft);color:var(--blue);border:1px solid #B9D2FA}.phase-banner.arrivee{background:var(--orangeSoft);color:var(--orange);border:1px solid #F7C89E}.phase-banner small{display:block;font-weight:600;color:var(--muted);margin-top:2px}
-#lecteur{border-radius:16px;overflow:hidden;background:#101820;border:3px solid var(--line);min-height:235px}#lecteur video{border-radius:13px}
-.gps-ligne{display:flex;align-items:flex-start;gap:10px;font-size:.8rem;color:var(--muted);background:#F8FAFC;padding:12px 13px;border-radius:12px;border:1px solid var(--line)}.gps-ligne strong{color:var(--text);font-variant-numeric:tabular-nums}.pastille{width:9px;height:9px;border-radius:50%;background:var(--red);margin-top:4px;flex:0 0 auto}.gps-ligne.fix .pastille{background:var(--green)}
-.scan-ctrl{display:grid;grid-template-columns:1fr auto;gap:10px}.btn{border:none;border-radius:14px;padding:15px 16px;font-size:.96rem;font-weight:900;cursor:pointer;transition:.16s}.btn:active{transform:scale(.98)}.btn:disabled{opacity:.42;cursor:not-allowed}.btn.primaire{background:var(--navy);color:#fff}.btn.stop{background:#E9EEF4;color:var(--navy);min-width:105px}
-.file h3{font-size:.86rem;color:var(--muted);font-weight:800;margin-bottom:10px;display:flex;justify-content:space-between}.file h3 b{color:var(--navy)}.item{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:11px 0;border-top:1px solid var(--line);font-size:.85rem}.item:first-of-type{border-top:none}.badge{font-size:.66rem;font-weight:900;padding:5px 8px;border-radius:8px;white-space:nowrap}.badge.depart{background:var(--blueSoft);color:var(--blue)}.badge.arrivee{background:var(--orangeSoft);color:var(--orange)}.badge.attente{background:#FFF7D8;color:#9A6D00}.code{font-weight:800}.meta{color:var(--muted);font-size:.72rem;text-align:right}.vide{color:var(--muted);font-size:.82rem;text-align:center;padding:10px 0}
-.modal-backdrop{position:fixed;inset:0;background:rgba(5,15,28,.68);display:none;align-items:center;justify-content:center;padding:18px;z-index:100}.modal-backdrop.show{display:flex}.modal{width:min(430px,100%);background:#fff;border-radius:20px;padding:20px;box-shadow:0 22px 70px rgba(0,0,0,.35)}.modal-icon{font-size:2.2rem}.modal h2{font-size:1.15rem;margin:8px 0 5px}.modal p{color:var(--muted);line-height:1.45;font-size:.9rem}.confirm-box{margin:14px 0;padding:13px;border-radius:12px;font-weight:900}.confirm-box.depart{background:var(--blueSoft);color:var(--blue)}.confirm-box.arrivee{background:var(--orangeSoft);color:var(--orange)}.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn.cancel{background:#EDF1F5;color:var(--text)}.btn.confirm.depart{background:var(--blue);color:#fff}.btn.confirm.arrivee{background:var(--orange);color:#fff}
-.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(130px);background:var(--navy);color:#fff;padding:13px 18px;border-radius:13px;font-size:.88rem;font-weight:800;box-shadow:0 10px 35px rgba(0,0,0,.28);transition:.28s;z-index:130;max-width:92%;text-align:center}.toast.show{transform:translateX(-50%) translateY(0)}.toast.ok{background:var(--green)}.toast.err{background:var(--red)}.toast.warn{background:var(--yellow);color:#2D2600}
-@media(max-width:430px){.phase-btn{min-height:145px;padding:14px 10px}.phase-btn .desc{font-size:.72rem}.scan-ctrl{grid-template-columns:1fr}.btn.stop{min-width:0}}
+
+/* ---------- THÈME JOUR / NUIT ---------- */
+body.theme-day{
+  --void:#eef3f8;
+  --panel:#ffffff;
+  --panel-2:#f6f8fb;
+  --panel-3:#e9eef5;
+  --raised:#dde6f0;
+  --line:#d8e0ea;
+  --line-2:#c2cedc;
+  --line-glow:#8fb3da;
+  --ink:#152235;
+  --ink-2:#40536b;
+  --ink-3:#6b7d92;
+  --ink-faint:#91a0b1;
+  --signal:#1976d2;
+  --signal-2:#0d63b8;
+  --signal-dim:rgba(25,118,210,.12);
+  --ok:#148b55;
+  --ok-dim:rgba(20,139,85,.12);
+  --warn:#c97900;
+  --warn-dim:rgba(201,121,0,.12);
+  --alert:#d92d4b;
+  --alert-dim:rgba(217,45,75,.12);
+  --alert-glow:rgba(217,45,75,.28);
+  --return:#7448c8;
+  --return-dim:rgba(116,72,200,.12);
+  --shadow:0 18px 48px rgba(31,47,66,.18);
+  --shadow-soft:0 7px 20px rgba(31,47,66,.14);
+}
+body.theme-day::before{
+  background:
+    radial-gradient(1200px 700px at 68% 42%, rgba(25,118,210,.07), transparent 60%),
+    radial-gradient(900px 600px at 20% 90%, rgba(116,72,200,.04), transparent 55%);
+}
+body.theme-day .statusbar{background:linear-gradient(180deg,#fff,var(--panel-2))}
+body.theme-day .brand .mark{background:linear-gradient(145deg,#e9f3ff,#d8eaff);box-shadow:inset 0 1px 0 #fff,0 5px 14px rgba(31,47,66,.15)}
+body.theme-day .map-badge,
+body.theme-day .sync-chip,
+body.theme-day .legend,
+body.theme-day .timeline{background:rgba(255,255,255,.92)}
+body.theme-day .leaflet-control-attribution{background:rgba(255,255,255,.82)!important}
+body.theme-day .leaflet-tooltip.cv-label{background:rgba(255,255,255,.96)}
+
+.theme-switch{
+  display:flex;align-items:center;padding:3px;border-radius:10px;
+  border:1px solid var(--line-2);background:var(--panel-3);gap:2px;
+}
+.theme-btn{
+  border:0;background:transparent;color:var(--ink-3);cursor:pointer;
+  padding:6px 9px;border-radius:7px;font:700 10px/1 'Inter',sans-serif;
+  transition:.15s;white-space:nowrap;
+}
+.theme-btn:hover{color:var(--ink)}
+.theme-btn.active{background:var(--signal);color:#fff;box-shadow:0 3px 8px var(--signal-dim)}
+.theme-btn .theme-icon{font-size:12px;margin-right:4px}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  background:var(--void);
+  color:var(--ink);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+.mono{font-family:'IBM Plex Mono',Consolas,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+
+/* ambiance : léger halo radial derrière la carte */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(1200px 700px at 68% 42%, rgba(61,155,255,.05), transparent 60%),
+    radial-gradient(900px 600px at 20% 90%, rgba(160,107,255,.04), transparent 55%);
+}
+
+.app{
+  position:relative;z-index:1;
+  display:grid;
+  grid-template-columns:352px 1fr;
+  grid-template-rows:60px 1fr;
+  height:100vh;
+}
+
+/* ---------- BANDEAU D'ÉTAT SYSTÈME (signature #1) ---------- */
+.statusbar{
+  grid-column:1/-1;
+  display:flex;align-items:center;gap:18px;
+  padding:0 20px;
+  background:linear-gradient(180deg,var(--panel-2),var(--panel));
+  border-bottom:1px solid var(--line);
+  position:relative;z-index:1300;
+}
+/* liseré d'état : vert nominal, rouge si alerte — barre pleine largeur */
+.statusbar::after{
+  content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;
+  background:var(--ok);opacity:.9;transition:background .4s, box-shadow .4s;
+}
+.statusbar.has-alert::after{
+  background:var(--alert);box-shadow:0 0 14px var(--alert-glow);
+  animation:barPulse 2.2s ease-in-out infinite;
+}
+@keyframes barPulse{0%,100%{opacity:.85}50%{opacity:.35}}
+
+.brand{display:flex;align-items:center;gap:13px;min-width:max-content}
+.brand .mark{
+  position:relative;width:40px;height:40px;border-radius:11px;display:grid;place-items:center;
+  background:linear-gradient(145deg,#12345e,#0a1c33);
+  border:1px solid var(--line-glow);
+  font-family:'IBM Plex Mono';font-weight:700;font-size:13px;color:var(--signal-2);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 6px 16px rgba(0,0,0,.4);
+}
+.brand .mark::after{
+  content:'';position:absolute;inset:-1px;border-radius:11px;
+  border:1px solid transparent;
+}
+.brand h1{
+  font-family:'Archivo Expanded','Archivo',sans-serif;
+  font-weight:700;font-size:14px;letter-spacing:.3px;line-height:1.15;color:var(--ink);
+  text-transform:uppercase;
+}
+.brand h1 span{
+  display:block;font-family:'IBM Plex Mono';
+  font-weight:500;font-size:9.5px;letter-spacing:2px;
+  color:var(--ink-3);margin-top:4px;
+}
+
+/* verdict système — le premier regard */
+.verdict{
+  display:flex;align-items:center;gap:11px;
+  padding:8px 16px;border-radius:11px;
+  background:var(--ok-dim);border:1px solid rgba(37,208,125,.28);
+  min-width:max-content;transition:.3s;
+}
+.verdict.alert{background:var(--alert-dim);border-color:rgba(255,59,92,.4)}
+.verdict .beacon{
+  width:9px;height:9px;border-radius:50%;background:var(--ok);
+  box-shadow:0 0 0 4px var(--ok-dim);flex-shrink:0;
+}
+.verdict.alert .beacon{background:var(--alert);box-shadow:0 0 0 4px var(--alert-dim);animation:beacon 1.1s infinite}
+@keyframes beacon{0%,100%{box-shadow:0 0 0 3px var(--alert-dim)}50%{box-shadow:0 0 0 8px transparent}}
+.verdict .vt{font-family:'Archivo';font-weight:800;font-size:13px;letter-spacing:.2px;color:var(--ok)}
+.verdict.alert .vt{color:var(--alert)}
+.verdict .vs{font-size:11px;color:var(--ink-3);border-left:1px solid var(--line-2);padding-left:11px}
+
+.statusbar .spacer{flex:1}
+
+/* horloge live — utile en salle op */
+.clock{
+  font-family:'IBM Plex Mono';font-size:13px;font-weight:600;color:var(--ink-2);
+  letter-spacing:.5px;min-width:max-content;
+}
+.clock b{color:var(--ink);font-size:14px}
+.clock .lbl{font-size:9px;color:var(--ink-faint);letter-spacing:1.5px;text-transform:uppercase;display:block;text-align:right}
+
+.tb-btn{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:8px 13px;border-radius:9px;
+  border:1px solid var(--line-2);
+  background:var(--panel-3);
+  color:var(--ink-2);font-size:12px;font-weight:600;
+  cursor:pointer;transition:.16s;white-space:nowrap;
+}
+.tb-btn:hover{background:var(--raised);border-color:var(--line-glow);color:var(--ink)}
+.tb-btn.on{background:var(--signal-dim);border-color:var(--signal);color:var(--signal-2)}
+.tb-btn.primary{background:var(--signal);border-color:var(--signal);color:#04101f;font-weight:800}
+.tb-btn.primary:hover{filter:brightness(1.08)}
+.tb-btn svg{width:14px;height:14px}
+
+/* ---------- SIDEBAR ---------- */
+.sidebar{
+  background:var(--panel);
+  border-right:1px solid var(--line);
+  overflow-y:auto;z-index:1200;
+  display:flex;flex-direction:column;
+}
+.s-sec{padding:16px 18px;border-bottom:1px solid var(--line)}
+.s-label{
+  display:flex;align-items:center;gap:8px;
+  font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:13px;
+}
+.s-label::after{content:'';flex:1;height:1px;background:var(--line)}
+.s-label .n{
+  font-family:'IBM Plex Mono';background:var(--panel-3);border:1px solid var(--line);
+  border-radius:99px;padding:1px 7px;color:var(--ink-2);letter-spacing:0;
+}
+
+/* ---------- PANNEAU D'ALERTES (signature #2) ----------
+   Discret et vide quand tout va bien ; prend le dessus dès qu'un
+   convoi perd le signal. L'interface change de posture. */
+.alertbox{
+  margin:0;border:none;border-bottom:1px solid var(--line);
+  transition:background .35s;
+}
+.alertbox.calm{padding:14px 18px;background:transparent}
+.alertbox.calm .alert-live{display:none}
+.alertbox.calm .alert-idle{display:flex}
+.alert-idle{
+  display:none;align-items:center;gap:10px;
+  font-size:11.5px;color:var(--ink-3);
+}
+.alert-idle .ok-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px var(--ok-dim)}
+.alertbox.active{
+  padding:14px 18px;
+  background:linear-gradient(180deg,rgba(255,59,92,.10),transparent);
+  border-bottom-color:rgba(255,59,92,.3);
+}
+.alertbox.active .alert-idle{display:none}
+.alert-live{display:none;flex-direction:column;gap:9px}
+.alertbox.active .alert-live{display:flex}
+.alert-hd{
+  display:flex;align-items:center;gap:9px;
+  font-family:'Archivo';font-weight:800;font-size:12px;letter-spacing:.4px;
+  color:var(--alert);text-transform:uppercase;
+}
+.alert-hd .cnt{
+  margin-left:auto;font-family:'IBM Plex Mono';font-size:11px;
+  background:var(--alert);color:#fff;border-radius:99px;padding:1px 9px;font-weight:700;
+}
+.alert-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 11px;border-radius:9px;cursor:pointer;
+  background:var(--alert-dim);border:1px solid rgba(255,59,92,.24);
+  transition:.14s;
+}
+.alert-item:hover{background:rgba(255,59,92,.22);border-color:var(--alert)}
+.alert-item .ai-tri{
+  width:22px;height:22px;flex-shrink:0;border-radius:6px;
+  background:var(--alert);color:#fff;display:grid;place-items:center;
+  font-weight:900;font-size:12px;transform:rotate(0);
+}
+.alert-item .ai-body{flex:1;min-width:0}
+.alert-item .ai-name{font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alert-item .ai-meta{font-size:10.5px;color:var(--ink-3);margin-top:2px}
+.alert-item .ai-time{font-family:'IBM Plex Mono';font-size:12px;font-weight:700;color:var(--alert)}
+
+/* ---------- KPIs ---------- */
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi{
+  position:relative;overflow:hidden;
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:var(--r-sm);
+  padding:13px 13px 12px;
+}
+.kpi .v{font-family:'Archivo';font-weight:800;font-size:26px;line-height:1;letter-spacing:-.6px;color:var(--ink)}
+.kpi .k{font-size:10.5px;color:var(--ink-3);margin-top:6px;letter-spacing:.2px}
+.kpi .spark{position:absolute;right:10px;top:11px;width:8px;height:8px;border-radius:50%;background:var(--ink-faint)}
+.kpi.ok .spark{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.kpi.ok .v{color:var(--ok)}
+.kpi.signal .spark{background:var(--signal)}
+.kpi.signal .v{color:var(--signal-2)}
+.kpi.alert{border-color:rgba(255,59,92,.3)}
+.kpi.alert .spark{background:var(--alert);box-shadow:0 0 8px var(--alert)}
+.kpi.alert .v{color:var(--alert)}
+.kpi.warn .spark{background:var(--warn)}
+.kpi.warn .v{color:var(--warn)}
+
+/* couverture */
+.cov-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
+.cov-head .pct{font-family:'Archivo';font-weight:800;font-size:22px;color:var(--signal-2)}
+.cov-head .lbl{font-size:11px;color:var(--ink-3);font-weight:600}
+.cov-bar{height:9px;border-radius:99px;background:var(--panel-3);overflow:hidden;border:1px solid var(--line)}
+.cov-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--signal),var(--signal-2));transition:width .9s cubic-bezier(.2,.7,.2,1);box-shadow:0 0 12px rgba(61,155,255,.4)}
+.cov-sub{font-size:11px;color:var(--ink-faint);margin-top:7px;font-family:'IBM Plex Mono'}
+
+/* ---------- TYPE DE MISSION ---------- */
+.mission-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mission-btn{padding:9px 7px;border-radius:9px;border:1px solid var(--line-2);background:var(--panel-2);color:var(--ink-2);font-size:11.5px;font-weight:700;font-family:inherit;cursor:pointer;transition:.15s}
+.mission-btn:hover{border-color:var(--signal);color:var(--signal-2)}
+.mission-btn.active{background:var(--signal);border-color:var(--signal);color:#04101f}
+.mission-btn[data-mode="all"]{grid-column:1/-1}
+
+/* champs */
+.field{margin-bottom:11px}.field:last-child{margin-bottom:0}
+.field input,.field select{
+  width:100%;padding:10px 12px;border-radius:9px;
+  border:1px solid var(--line-2);
+  background:var(--panel-2);color:var(--ink);
+  font-size:12.5px;font-family:inherit;outline:none;transition:.15s;
+}
+.field select{cursor:pointer}
+.field input:focus,.field select:focus{border-color:var(--signal);box-shadow:0 0 0 3px var(--signal-dim)}
+.field input::placeholder{color:var(--ink-faint)}
+.field option{background:var(--panel-2)}
+
+.action-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.chip-btn{
+  padding:8px;border-radius:9px;
+  border:1px solid var(--line-2);background:var(--panel-2);
+  color:var(--ink-2);font-size:11.5px;font-weight:700;
+  font-family:inherit;cursor:pointer;transition:.15s;
+}
+.chip-btn:hover{border-color:var(--signal);color:var(--signal-2)}
+.chip-btn.alert:hover{border-color:var(--alert);color:var(--alert)}
+
+.btn-reset{
+  width:100%;margin-top:12px;padding:9px;border-radius:9px;
+  border:1px solid var(--line-2);background:transparent;
+  color:var(--ink-3);font-size:12px;font-weight:600;cursor:pointer;transition:.15s;
+}
+.btn-reset:hover{border-color:var(--alert);color:var(--alert)}
+.hint{font-size:10.5px;color:var(--ink-faint);margin-top:9px;line-height:1.4}
+
+/* couches + fond de carte */
+.layer-row{
+  display:flex;align-items:center;gap:10px;
+  padding:7px 3px;cursor:pointer;font-size:12.5px;color:var(--ink-2);transition:.12s;
+}
+.layer-row:hover{color:var(--ink)}
+.layer-row input{width:15px;height:15px;cursor:pointer;accent-color:var(--signal)}
+.basemap-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.bm-btn{
+  padding:8px 6px;border-radius:8px;
+  border:1px solid var(--line-2);background:var(--panel-2);
+  color:var(--ink-3);font-size:11px;font-weight:700;
+  font-family:inherit;cursor:pointer;transition:.15s;
+}
+.bm-btn:hover{border-color:var(--line-glow);color:var(--ink-2)}
+.bm-btn.active{background:var(--signal);color:#04101f;border-color:var(--signal)}
+
+/* liste convois */
+.dep-head{
+  display:flex;align-items:center;gap:8px;margin:14px 2px 7px;
+  font-family:'IBM Plex Mono';font-size:10px;font-weight:600;letter-spacing:1px;
+  text-transform:uppercase;color:var(--ink-faint);
+}
+.dep-head:first-child{margin-top:2px}
+.dep-head::after{content:'';flex:1;height:1px;background:var(--line)}
+.dep-head .n{background:var(--panel-3);border:1px solid var(--line);border-radius:99px;padding:1px 7px;color:var(--ink-3)}
+
+.conv{
+  display:flex;align-items:center;gap:11px;
+  padding:11px 11px;border-radius:11px;cursor:pointer;transition:.14s;
+  border:1px solid transparent;
+}
+.conv:hover{background:var(--panel-2)}
+.conv.active{background:var(--signal-dim);border-color:var(--signal)}
+.conv.is-lost{border-left:3px solid var(--alert)}
+.conv .pin{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.conv .meta{flex:1;min-width:0}
+.conv .name{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
+.conv .info{font-size:10.5px;color:var(--ink-3);margin-top:3px;display:flex;gap:8px;justify-content:space-between}
+.conv .st{font-size:9px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:4px 7px;border-radius:6px;white-space:nowrap}
+.st.done{background:var(--ok-dim);color:var(--ok)}
+.st.live{background:var(--signal-dim);color:var(--signal-2)}
+.st.lost{background:var(--alert-dim);color:var(--alert)}
+.st.partial{background:var(--return-dim);color:var(--return)}
+.st.aller-done{background:var(--signal-dim);color:var(--signal-2)}
+
+/* ---------- CARTE ---------- */
+.stage{position:relative;overflow:hidden}
+#map{position:absolute;inset:0;background:#060a12}
+
+.map-badge{
+  position:absolute;left:16px;top:16px;z-index:790;
+  background:rgba(12,18,32,.86);backdrop-filter:blur(12px);
+  border:1px solid var(--line-2);border-radius:12px;
+  padding:11px 14px;box-shadow:var(--shadow-soft);pointer-events:none;
+}
+.map-badge .t{font-family:'Archivo Expanded','Archivo';font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink)}
+.map-badge .s{font-family:'IBM Plex Mono';font-size:10px;color:var(--ink-3);margin-top:3px;letter-spacing:.5px}
+
+.sync-chip{
+  position:absolute;right:16px;top:16px;z-index:800;
+  background:rgba(12,18,32,.9);backdrop-filter:blur(12px);
+  border:1px solid var(--line-2);border-radius:99px;
+  padding:8px 14px;font-size:11.5px;color:var(--ink-2);
+  display:flex;align-items:center;gap:8px;box-shadow:var(--shadow-soft);
+}
+.sync-chip .live{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
+.sync-chip.err{border-color:rgba(255,59,92,.4)}
+.sync-chip.err .live{background:var(--alert);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.sync-chip b{color:var(--ink);font-family:'IBM Plex Mono'}
+
+/* légende — condensée à 5 états */
+.legend{
+  position:absolute;left:16px;bottom:16px;z-index:800;
+  width:262px;
+  background:rgba(12,18,32,.92);backdrop-filter:blur(14px);
+  border:1px solid var(--line-2);border-radius:var(--r);
+  padding:12px 14px;box-shadow:var(--shadow);
+}
+.legend-head{display:flex;align-items:center;justify-content:space-between}
+.legend h4{font-family:'IBM Plex Mono';font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--ink-3)}
+.legend-toggle{width:24px;height:24px;border-radius:7px;border:1px solid var(--line-2);background:var(--panel-2);color:var(--ink-2);font-weight:800;cursor:pointer}
+.legend-toggle:hover{border-color:var(--signal);color:var(--signal-2)}
+.legend-body{margin-top:11px;display:grid;gap:8px}
+.legend.collapsed .legend-body{display:none}
+.legend .row{display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--ink-2)}
+.legend .row b{margin-left:auto;font-family:'IBM Plex Mono';color:var(--ink);font-weight:600}
+.legend .sym{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;flex:0 0 20px;font-size:10px;font-weight:900;color:#04101f;border:2px solid rgba(255,255,255,.15)}
+.legend .sym.todo{background:var(--panel-3);color:var(--ink-3);border-color:var(--line-2)}
+.legend .sym.done{background:var(--signal)}
+.legend .sym.mission{background:var(--ok)}
+.legend .sym.return{background:var(--return);color:#fff}
+.legend .sym.alert{border-radius:5px;background:var(--alert);color:#fff}
+.legend-note{font-size:10px;color:var(--ink-faint);line-height:1.45;margin-top:4px;padding-top:9px;border-top:1px solid var(--line)}
+
+/* ---------- TIMELINE ---------- */
+.timeline{
+  position:absolute;left:50%;transform:translateX(-50%);bottom:16px;z-index:850;
+  width:min(600px,52vw);
+  background:rgba(12,18,32,.94);backdrop-filter:blur(14px);
+  border:1px solid var(--line-2);border-radius:var(--r);
+  padding:13px 17px;box-shadow:var(--shadow);display:none;
+}
+.timeline.show{display:block}
+.tl-head{display:flex;align-items:center;gap:12px;margin-bottom:11px}
+.tl-play{width:34px;height:34px;border-radius:50%;border:none;background:var(--signal);color:#04101f;cursor:pointer;display:grid;place-items:center;flex-shrink:0;transition:.15s}
+.tl-play:hover{filter:brightness(1.12)}
+.tl-time{font-family:'IBM Plex Mono';font-size:15px;font-weight:700;color:var(--ink)}
+.tl-date{font-size:10px;color:var(--ink-faint);letter-spacing:1px;text-transform:uppercase;margin-top:1px}
+.tl-track{position:relative;height:6px;background:var(--panel-3);border-radius:99px;cursor:pointer}
+.tl-prog{position:absolute;left:0;top:0;bottom:0;background:var(--signal);border-radius:99px;width:0%}
+.tl-knob{position:absolute;top:50%;transform:translate(-50%,-50%);width:15px;height:15px;border-radius:50%;background:#fff;border:4px solid var(--signal);left:0%}
+
+/* ---------- DRAWER ---------- */
+.drawer{
+  position:absolute;right:0;top:0;bottom:0;width:344px;
+  background:var(--panel);border-left:1px solid var(--line-2);z-index:900;
+  transform:translateX(100%);transition:transform .32s cubic-bezier(.2,.7,.2,1);
+  box-shadow:-18px 0 50px rgba(0,0,0,.5);overflow-y:auto;
+}
+.drawer.open{transform:translateX(0)}
+.dr-hd{
+  padding:17px 19px;border-bottom:1px solid var(--line);
+  position:sticky;top:0;background:var(--panel);display:flex;align-items:flex-start;gap:12px;z-index:3;
+}
+.dr-hd .pin{width:13px;height:13px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.dr-hd .t{flex:1;min-width:0}
+.dr-hd h3{font-family:'Archivo';font-size:16px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dr-hd .sub{font-size:11px;color:var(--ink-3);margin-top:4px;font-family:'IBM Plex Mono'}
+.dr-close{background:none;border:none;color:var(--ink-3);font-size:22px;cursor:pointer;line-height:1}
+.dr-close:hover{color:var(--ink)}
+.dr-body{padding:17px 19px}
+.dr-stat{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:17px}
+.dr-stat .c{background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:11px 12px}
+.dr-stat .c .v{font-family:'Archivo';font-weight:800;font-size:19px;color:var(--ink)}
+.dr-stat .c .k{font-size:10px;color:var(--ink-3);margin-top:4px}
+.dr-prog{margin-bottom:17px}
+.phase-label{
+  display:flex;align-items:center;gap:8px;margin:15px 0 10px;
+  font-family:'IBM Plex Mono';font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--ink-faint);
+}
+.phase-label::after{content:'';flex:1;height:1px;background:var(--line)}
+.phase-label .chip{border-radius:99px;padding:2px 9px;font-size:10px;background:var(--signal-dim);border:1px solid var(--line-2);color:var(--signal-2);letter-spacing:0}
+.phase-label .chip.retour{color:var(--return);background:var(--return-dim)}
+.dr-steps{position:relative;padding-left:21px}
+.dr-steps::before{content:'';position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.step{position:relative;padding:0 0 15px}.step:last-child{padding-bottom:0}
+.step .node{position:absolute;left:-21px;top:2px;width:12px;height:12px;border-radius:50%;background:var(--panel);border:2px solid var(--line-2)}
+.step.done .node{background:var(--ok);border-color:var(--ok)}
+.step.current .node{background:var(--signal);border-color:var(--signal);box-shadow:0 0 0 4px var(--signal-dim);animation:pulse 1.6s infinite}
+.step.warnstep .node{background:var(--warn);border-color:var(--warn)}
+.step .name{font-size:12.5px;font-weight:700;color:var(--ink)}
+.step .meta{font-size:10.5px;color:var(--ink-3);margin-top:3px}
+.step.done .name{color:var(--ink-3)}
+
+/* ---------- MARQUEURS CARTE ---------- */
+.cv-ring{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;box-shadow:0 5px 16px rgba(0,0,0,.55)}
+.cv-marker{display:grid;place-items:center;border-radius:50%;border:2px solid rgba(255,255,255,.9);width:30px;height:30px;position:relative;overflow:hidden}
+.cv-marker svg{width:17px;height:17px;display:block;filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+.cv-marker .truck-heading{width:17px;height:17px;display:grid;place-items:center;transform-origin:50% 50%;transition:transform .4s ease}
+.cv-marker .status-mini{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;display:grid;place-items:center;background:#fff;color:var(--void);border:1px solid rgba(0,0,0,.2);font:900 7px/1 'Inter'}
+.cv-selected .cv-ring{box-shadow:0 0 0 4px rgba(61,155,255,.28),0 0 0 9px rgba(61,155,255,.12),0 8px 22px rgba(0,0,0,.6)!important;animation:selHalo 1.7s ease-in-out infinite}
+@keyframes selHalo{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+.lost-marker{animation:lostpulse 1.3s infinite;border-radius:50%}
+@keyframes lostpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,59,92,.5)}50%{box-shadow:0 0 0 12px rgba(255,59,92,0)}}
+.route-arrow-layer{pointer-events:none}
+
+.cm-wrap{position:relative;width:32px;height:32px;display:grid;place-items:center}
+.cm{position:relative;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-family:'IBM Plex Mono';font-weight:800;font-size:11px;border:2px solid rgba(255,255,255,.9);box-shadow:0 3px 10px rgba(0,0,0,.5);background:var(--panel);color:var(--ink-3);transition:transform .15s}
+.cm:hover{transform:scale(1.16)}
+.cm .cm-glyph{font-size:13px;line-height:1}
+.cm.a-todo{background:rgba(22,31,49,.9);color:var(--ink-3);border-color:var(--line-2)}
+.cm.a-done{background:var(--signal);color:#04101f}
+.cm.returning{background:var(--return);color:#fff}
+.cm.mission-done{background:var(--ok);color:#04101f}
+.cm.a-next{background:var(--warn);color:#04101f;animation:nextpulse 1.7s infinite}
+.cm.a-place{background:var(--signal-2);color:#04101f;animation:placepulse 1.5s infinite}
+.cm.a-court{background:#e07b2f;color:#fff}
+.cm.problem{border-radius:7px;background:var(--alert);color:#fff}
+.cm .r{position:absolute;right:-4px;top:-4px;width:12px;height:12px;border-radius:50%;border:2px solid var(--panel);background:var(--line-2);box-shadow:0 1px 4px rgba(0,0,0,.5)}
+.cm .r.done{background:var(--ok)}
+.cm .r.place{background:var(--return);animation:pulse 1.6s infinite}
+.cm .r.pending{background:var(--panel);border-color:var(--return)}
+@keyframes nextpulse{0%,100%{box-shadow:0 0 0 0 rgba(245,165,36,.4)}50%{box-shadow:0 0 0 9px rgba(245,165,36,0)}}
+@keyframes placepulse{0%,100%{box-shadow:0 0 0 2px rgba(95,178,255,.3)}50%{box-shadow:0 0 0 10px rgba(95,178,255,0)}}
+.map-zoom-low .cm-wrap{transform:scale(.7);opacity:.85}
+.map-zoom-mid .cm-wrap{transform:scale(.86)}
+
+/* leaflet overrides — sombre */
+.leaflet-control-zoom a{background:var(--panel-2)!important;color:var(--ink-2)!important;border-color:var(--line-2)!important}
+.leaflet-control-zoom a:hover{background:var(--raised)!important;color:var(--ink)!important}
+.leaflet-bar{border:1px solid var(--line-2)!important;box-shadow:var(--shadow-soft)!important}
+.leaflet-popup-content-wrapper{background:var(--panel-2);color:var(--ink);border:1px solid var(--line-2);border-radius:12px;box-shadow:var(--shadow)}
+.leaflet-popup-content{font-size:12px;line-height:1.55;color:var(--ink-2)}
+.leaflet-popup-tip{background:var(--panel-2);border:1px solid var(--line-2)}
+.leaflet-container{font-family:'Inter',sans-serif}
+.leaflet-control-attribution{background:rgba(12,18,32,.7)!important;color:var(--ink-faint)!important}
+.leaflet-control-attribution a{color:var(--ink-3)!important}
+.popup-title{font-family:'Archivo';font-weight:800;color:var(--signal-2);font-size:13px;margin-bottom:5px}
+.popup-phase{display:inline-block;border-radius:6px;padding:1px 6px;margin-right:4px;font-family:'IBM Plex Mono';font-size:10px;font-weight:700;background:var(--signal-dim);border:1px solid var(--line-2);color:var(--signal-2)}
+.popup-phase.retour{color:var(--return);background:var(--return-dim)}
+.leaflet-tooltip.cv-label{background:rgba(12,18,32,.94);color:var(--ink);border:1px solid var(--line-2);border-radius:7px;box-shadow:var(--shadow-soft);font-family:'Inter';font-size:11px;font-weight:700;padding:4px 8px}
+.leaflet-tooltip.cv-label::before{border-top-color:var(--line-2)}
+
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:99px}
+::-webkit-scrollbar-thumb:hover{background:var(--line-glow)}
+::-webkit-scrollbar-track{background:transparent}
+
+.empty{text-align:center;padding:22px 10px;color:var(--ink-faint);font-size:12px}
+
+@media(max-width:900px){
+  .app{grid-template-columns:1fr;grid-template-rows:60px auto 1fr}
+  .sidebar{max-height:40vh}.drawer{width:100%}
+  .brand h1 span{display:none}.verdict .vs{display:none}
+}
 </style>
 </head>
 <body>
-<header><div class="header-row"><div class="brand"><div class="logo">SGLE</div><div><div class="title">Scan des kits électoraux</div><div class="subtitle">Départ de la base · Arrivée au centre</div></div></div><div id="reseau" class="on">En ligne</div></div></header>
-<main>
-  <section class="card">
-    <div class="section-title">1. Choisir obligatoirement le type de scan</div>
-    <p class="instruction">Avant de démarrer la caméra, indique clairement si le kit <b>quitte la base</b> ou s'il <b>arrive au centre de vote</b>.</p>
-    <div class="phase-select">
-      <button class="phase-btn" data-phase="depart" onclick="setPhase('depart')" type="button"><span class="check">✓</span><div><div class="icon">🚚</div><div class="name">DÉPART</div><div class="desc">Le kit quitte la base départementale vers le centre de vote.</div></div></button>
-      <button class="phase-btn" data-phase="arrivee" onclick="setPhase('arrivee')" type="button"><span class="check">✓</span><div><div class="icon">📍</div><div class="name">ARRIVÉE</div><div class="desc">Le kit est reçu au centre de vote après le transport.</div></div></button>
+<div class="app">
+
+  <!-- ======= BANDEAU D'ÉTAT SYSTÈME ======= -->
+  <header class="statusbar" id="statusbar">
+    <div class="brand">
+      <div class="mark">CV</div>
+      <h1>UNOPS | SUIVI DES CONVOIS<span>Livraison et Récupération · 2026</span></h1>
     </div>
-  </section>
 
-  <div id="phaseBanner" class="phase-banner"><span id="phaseBannerIcon"></span><div><span id="phaseBannerTitle"></span><small id="phaseBannerDesc"></small></div></div>
+    <div class="verdict" id="verdict">
+      <span class="beacon"></span>
+      <div>
+        <div class="vt" id="verdictText">Situation nominale</div>
+      </div>
+      <div class="vs" id="verdictSub">— convois suivis</div>
+    </div>
 
-  <section class="card">
-    <div class="section-title">2. Scanner le code du kit</div>
-    <div id="lecteur"></div>
-    <div class="gps-ligne" id="gpsBox" style="margin-top:12px"><span class="pastille"></span><div><span>Position GPS</span><br><strong id="gpsTxt">Recherche…</strong></div></div>
-    <div class="scan-ctrl" style="margin-top:12px"><button class="btn primaire" id="btnScan" onclick="demarrerScan()" disabled>Démarrer le scan</button><button class="btn stop" id="btnStop" onclick="arreterScan()" disabled>Arrêter</button></div>
-  </section>
+    <div class="spacer"></div>
 
-  <section class="card file"><h3>Scans récents <b id="fileCount">0 en attente</b></h3><div id="fileListe"><div class="vide">Aucun scan pour l'instant</div></div></section>
-</main>
+    <div class="theme-switch" id="themeSwitch" aria-label="Mode d’affichage">
+      <button class="theme-btn active" data-theme="auto" type="button" title="Selon l’heure locale"><span class="theme-icon">◐</span>Auto</button>
+      <button class="theme-btn" data-theme="day" type="button" title="Forcer le mode jour"><span class="theme-icon">☀</span>Jour</button>
+      <button class="theme-btn" data-theme="night" type="button" title="Forcer le mode nuit"><span class="theme-icon">☾</span>Nuit</button>
+    </div>
 
-<div class="modal-backdrop" id="confirmModal"><div class="modal"><div class="modal-icon" id="modalIcon">⚠️</div><h2 id="modalTitle">Confirmer le scan</h2><p id="modalText"></p><div id="modalPhase" class="confirm-box"></div><div class="modal-actions"><button class="btn cancel" onclick="annulerConfirmation()">Annuler</button><button class="btn confirm" id="btnConfirm" onclick="confirmerScan()">Confirmer</button></div></div></div>
-<div class="toast" id="toast"></div>
+    <div class="clock">
+      <span class="lbl">Heure locale</span>
+      <b id="clock">—:—:—</b>
+    </div>
+
+    <button class="tb-btn" id="btnTimeline">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      Replay
+    </button>
+    <button class="tb-btn" id="btnHeat">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2c2 4 5 6 5 10a5 5 0 0 1-10 0c0-4 3-6 5-10z"/></svg>
+      Densité
+    </button>
+    <button class="tb-btn" id="btnFitNational">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l6-3 6 3 6-3v13l-6 3-6-3-6 3V7z"/><path d="M9 4v13"/><path d="M15 7v13"/></svg>
+      Vue nationale
+    </button>
+    <button class="tb-btn primary" id="btnRefresh">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+      Actualiser
+    </button>
+  </header>
+
+  <!-- ======= SIDEBAR ======= -->
+  <aside class="sidebar">
+
+    <!-- panneau d'alertes : signature -->
+    <div class="alertbox calm" id="alertbox">
+      <div class="alert-idle">
+        <span class="ok-dot"></span>
+        Aucun convoi en alerte · tous les signaux reçus
+      </div>
+      <div class="alert-live">
+        <div class="alert-hd">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          Signal perdu
+          <span class="cnt" id="alertCnt">0</span>
+        </div>
+        <div id="alertList"></div>
+      </div>
+    </div>
+
+    <div class="s-sec">
+      <div class="s-label">Indicateurs opérationnels</div>
+      <div class="kpi-grid">
+        <div class="kpi ok"><span class="spark"></span><div class="v" id="kActive">0</div><div class="k">Missions suivies</div></div>
+        <div class="kpi signal"><span class="spark"></span><div class="v" id="kLive">0</div><div class="k">Signal récent</div></div>
+        <div class="kpi alert"><span class="spark"></span><div class="v" id="kLost">0</div><div class="k">Signal perdu</div></div>
+        <div class="kpi warn"><span class="spark"></span><div class="v" id="kCentres">0</div><div class="k">Étapes faites</div></div>
+      </div>
+    </div>
+
+    <div class="s-sec">
+      <div class="cov-head">
+        <span class="lbl">Couverture des étapes</span>
+        <span class="pct" id="covPct">—</span>
+      </div>
+      <div class="cov-bar"><div class="cov-fill" id="covFill" style="width:0%"></div></div>
+      <div class="cov-sub" id="covSub">— étapes complétées</div>
+    </div>
+
+    <div class="s-sec">
+      <div class="s-label">Mode de suivi</div>
+      <div class="mission-tabs" id="missionTabs">
+        <button class="mission-btn active" data-mode="convoi" type="button">🚛 Convois</button>
+        <button class="mission-btn" data-mode="trajet" type="button">🚗 Trajets simples</button>
+        <button class="mission-btn" data-mode="all" type="button">📍 Toutes les missions</button>
+      </div>
+    </div>
+
+    <div class="s-sec">
+      <div class="s-label">Filtres</div>
+      <div class="field"><input id="fSearch" placeholder="Rechercher un convoi…" type="text"/></div>
+      <div class="field"><select id="fConvoiSolo"><option value="">Tous les convois</option></select></div>
+      <div class="field"><select id="fStatut">
+        <option value="">Tous les statuts</option>
+        <option value="live">Signal récent / en route</option>
+        <option value="lost">Signal perdu</option>
+        <option value="done">Mission terminée</option>
+        <option value="partial">Retour en cours</option>
+      </select></div>
+      <div class="field"><select id="fDep"><option value="">Tous les départements</option></select></div>
+      <div class="action-row">
+        <button class="chip-btn" id="btnOnlyLive" type="button">Signal récent</button>
+        <button class="chip-btn alert" id="btnOnlyLost" type="button">Signal perdu</button>
+      </div>
+      <button class="btn-reset" id="btnResetFilters">Réinitialiser les filtres</button>
+      <div class="hint">Sélectionne un convoi pour isoler son parcours sur la carte.</div>
+    </div>
+
+    <div class="s-sec">
+      <div class="s-label">Fond de carte</div>
+      <div class="basemap-grid">
+        <button class="bm-btn" data-bm="sombre">Sombre</button>
+        <button class="bm-btn" data-bm="satellite">Satellite</button>
+        <button class="bm-btn active" data-bm="routier">Routier</button>
+        <button class="bm-btn" data-bm="clair">Clair</button>
+        <button class="bm-btn" data-bm="topo">Topo</button>
+        <button class="bm-btn" data-bm="humanitaire">Humani.</button>
+      </div>
+    </div>
+
+    <div class="s-sec">
+      <div class="s-label">Couches</div>
+      <label class="layer-row"><input checked id="lyCentres" type="checkbox"/> Centres de vote</label>
+      <label class="layer-row"><input checked id="lyTrajets" type="checkbox"/> Trajets GPS</label>
+      <label class="layer-row"><input checked id="lyPositions" type="checkbox"/> Positions actuelles</label>
+      <label class="layer-row"><input checked id="lyRoutes" type="checkbox"/> Routes réalistes (OSRM)</label>
+      <label class="layer-row"><input checked id="lyLabels" type="checkbox"/> Noms des convois</label>
+      <label class="layer-row"><input checked id="lyScans" type="checkbox"/> Confirmation scan ELMS</label>
+      <label class="layer-row"><input id="lyProblems" type="checkbox"/> Uniquement les étapes à surveiller</label>
+    </div>
+
+    <div class="s-sec" style="border-bottom:none;flex:1">
+      <div class="s-label">Missions <span class="n" id="convCount">0</span></div>
+      <div id="convList"><div class="empty">Chargement…</div></div>
+    </div>
+  </aside>
+
+  <!-- ======= CARTE ======= -->
+  <main class="stage">
+    <div id="map"></div>
+
+    <div class="map-badge">
+      <div class="t">Suivi temps réel</div>
+      <div class="s" id="mapBadgeSub">10 départements · flotte active</div>
+    </div>
+
+    <div class="sync-chip" id="syncChip">
+      <span class="live"></span>
+      <span id="syncText">Chargement…</span>
+    </div>
+
+    <div class="legend collapsed" id="mapLegend">
+      <div class="legend-head">
+        <h4>Légende</h4>
+        <button class="legend-toggle" id="legendToggle" type="button" title="Déployer">+</button>
+      </div>
+      <div class="legend-body">
+        <div class="row"><span class="sym todo">○</span> Étape à venir</div>
+        <div class="row"><span class="sym done">A</span> Aller complété <b id="lgAllerDone">0</b></div>
+        <div class="row"><span class="sym return">↩</span> Retour en cours <b id="lgRetourCours">0</b></div>
+        <div class="row"><span class="sym mission">✓</span> Mission terminée <b id="lgMissionDone">0</b></div>
+        <div class="row"><span class="sym alert">!</span> Signal perdu <b id="lgLost">0</b></div>
+        <div class="legend-note">L'anneau autour d'un convoi indique sa progression. Le losange rouge signale une étape à surveiller.</div>
+      </div>
+    </div>
+
+    <div class="timeline" id="timeline">
+      <div class="tl-head">
+        <button class="tl-play" id="tlPlay"><svg fill="currentColor" width="14" height="14" id="tlIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+        <div>
+          <div class="tl-time" id="tlTime">—</div>
+          <div class="tl-date">Replay des trajets réels</div>
+        </div>
+      </div>
+      <div class="tl-track" id="tlTrack">
+        <div class="tl-prog" id="tlProg"></div>
+        <div class="tl-knob" id="tlKnob"></div>
+      </div>
+    </div>
+
+    <div class="drawer" id="drawer">
+      <div class="dr-hd">
+        <span class="pin" id="drPin"></span>
+        <div class="t"><h3 id="drName">—</h3><div class="sub" id="drSub">—</div></div>
+        <button class="dr-close" id="drClose">×</button>
+      </div>
+      <div class="dr-body" id="drBody"></div>
+    </div>
+  </main>
+</div>
 
 <script>
-const URL_APPS_SCRIPT='https://script.google.com/macros/s/AKfycbwvtEB3ygCT9LzYM0YtGoFl09UMqf1hjOYUd0fm_usyZFv53KloRop3S6plYIAPTOQxag/exec';
-const CONVOI='';
-const AGENT='';
-let phase=null, position=null, scanner=null, enScan=false, scanEnAttente=null;
-const CLE_FILE='elms_file_attente';
+/* ============================================================
+   1. CONFIGURATION — inchangée
+   ============================================================ */
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxTV3lf-h7rES9t_XiomZ-MfmHRd2mRGvP7P0JVCs5MEiWfEZgsIN2HOPdit4_14Y2a9A/exec';
+const ENDPOINT_URL = WEB_APP_URL + '?action=carte';
+const REFRESH_MS = 60000;
 
-function suivreGPS(){
-  if(!navigator.geolocation){maj('gpsTxt','GPS indisponible');return;}
-  navigator.geolocation.watchPosition(p=>{
-    position={lat:p.coords.latitude,lng:p.coords.longitude,acc:Math.round(p.coords.accuracy)};
-    document.getElementById('gpsBox').classList.add('fix');
-    maj('gpsTxt',`${position.lat.toFixed(5)}, ${position.lng.toFixed(5)} · ±${position.acc} m`);
-  },()=>{maj('gpsTxt','Autorisation GPS refusée');document.getElementById('gpsBox').classList.remove('fix');},{enableHighAccuracy:true,maximumAge:3000,timeout:15000});
+const MAX_ACC_M = 80, MAX_SPEED_KMH = 130, MAX_JUMP_M = 2500, MAX_SHORT_GAP_MIN = 10, MIN_POINT_DIST_M = 8;
+
+/* ============================================================
+   2. ÉTAT + classification
+   ============================================================ */
+let allConvois = [], view = [];
+let missionMode = 'convoi';
+
+function typeMission(c){
+  const explicite=String(c.typeMission||c.type_mission||c.missionType||'').trim().toUpperCase();
+  if(explicite.includes('TRAJET')) return 'trajet';
+  if(explicite.includes('CONVOI')) return 'convoi';
+  const phases=(c.etapes||[]).map(e=>String(e.phase||'').trim().toUpperCase());
+  return phases.includes('TRAJET') && !phases.some(p=>p==='ALLER'||p==='RETOUR') ? 'trajet' : 'convoi';
 }
 
-function setPhase(p){
-  if(!['depart','arrivee'].includes(p)) return;
-  phase=p;
-  document.querySelectorAll('.phase-btn').forEach(b=>b.classList.toggle('actif',b.dataset.phase===p));
-  const banner=document.getElementById('phaseBanner');
-  banner.className=`phase-banner show ${p}`;
-  maj('phaseBannerIcon',p==='depart'?'🚚':'📍');
-  maj('phaseBannerTitle',p==='depart'?'MODE DÉPART SÉLECTIONNÉ':'MODE ARRIVÉE SÉLECTIONNÉ');
-  maj('phaseBannerDesc',p==='depart'?'Le kit quitte la base départementale.':'Le kit est reçu au centre de vote.');
-  document.getElementById('btnScan').disabled=false;
-  if(enScan) toast(`Mode changé : ${p==='depart'?'DÉPART DE LA BASE':'ARRIVÉE AU CENTRE'}`,'warn');
+function libelleObjet(c){ return typeMission(c)==='trajet' ? 'trajet' : 'convoi'; }
+function estTrajetSimple(c){ return typeMission(c)==='trajet'; }
+function phaseAffichee(c,e){
+  if(estTrajetSimple(c)) return 'TRAJET';
+  return String(e?.phase||'').trim().toUpperCase();
+}
+function libelleEtapeCarte(c,e){
+  const cls=classifyEtape(e?.statut);
+  if(estTrajetSimple(c)){
+    if(cls==='done') return 'Étape du trajet complétée';
+    if(cls==='place') return 'Véhicule sur place';
+    if(cls==='next') return 'Prochaine étape du trajet';
+    if(cls==='court') return 'Passage court détecté';
+    return 'Étape du trajet à venir';
+  }
+  const ph=String(e?.phase||'').toUpperCase();
+  if(ph==='RETOUR'){
+    if(cls==='done') return 'Retour complété';
+    if(cls==='place') return 'Convoi sur place au retour';
+    if(cls==='next') return 'Prochaine étape retour';
+    return 'Étape retour à venir';
+  }
+  if(cls==='done') return 'Aller complété';
+  if(cls==='place') return 'Convoi sur place';
+  if(cls==='next') return 'Prochaine étape';
+  return 'Étape à venir';
 }
 
-function demarrerScan(){
-  if(!phase){toast('Choisis d’abord DÉPART ou ARRIVÉE.','warn');return;}
-  if(enScan) return;
-  scanner=new Html5Qrcode('lecteur');
-  scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:220,height:220}},onScan,()=>{}).then(()=>{
-    enScan=true;document.getElementById('btnScan').disabled=true;document.getElementById('btnStop').disabled=false;
-  }).catch(()=>toast('Caméra inaccessible. Vérifie les autorisations.','err'));
+function displayName(c){
+  if(c.nom && !/^[A-Z_0-9]+$/.test(c.nom)) return c.nom;
+  if(c.commune) return c.commune + (c.departement? ' · '+c.departement : '');
+  const raw = (c.nom||c.id||'').replace(/_/g,' ').toLowerCase();
+  return raw.replace(/\b\w/g, m=>m.toUpperCase());
+}
+function displayLabel(c){
+  const nom = displayName(c);
+  const id = String(c.id||'').trim();
+  if(!id || nom.toLowerCase().includes(id.toLowerCase())) return nom;
+  return `${nom} · ${id}`;
+}
+/* couleurs remappées sur la nouvelle palette sombre */
+function classify(statutGlobal){
+  const s = (statutGlobal||'').toUpperCase();
+  if(s.includes('SIGNAL PERDU'))     return {key:'lost',      label:'Signal perdu',     color:'#ff3b5c', cls:'lost'};
+  if(s.includes('MISSION TERMINÉE')) return {key:'done',      label:'Mission terminée', color:'#25d07d', cls:'done'};
+  if(s.includes('RETOUR EN COURS') || s.includes('RETOUR PARTIEL'))
+                                     return {key:'partial',   label:'Retour en cours',  color:'#a06bff', cls:'partial'};
+  if(s.includes('ALLER TERMINÉ'))    return {key:'allerDone', label:'Aller terminé',    color:'#3d9bff', cls:'aller-done'};
+  if(s.includes('TRAJET TERMINÉ') || s.includes('TRAJET TERMINE'))
+                                     return {key:'done',      label:'Trajet terminé',   color:'#25d07d', cls:'done'};
+  if(s.includes('TRAJET EN COURS'))  return {key:'live',      label:'Trajet en cours',  color:'#5fb2ff', cls:'live'};
+  if(s.includes('ALLER EN COURS') || s.includes('EN ROUTE'))
+                                     return {key:'live',      label:'En route',         color:'#5fb2ff', cls:'live'};
+  return {key:'live', label:statutGlobal||'En route', color:'#5fb2ff', cls:'live'};
+}
+function classifyEtape(statut){
+  const s = (statut||'').toUpperCase();
+  if(s.includes('COMPLÉTÉ'))      return 'done';
+  if(s.includes('SUR PLACE'))     return 'place';
+  if(s.includes('PASSAGE COURT')) return 'court';
+  if(s.includes('PROCHAINE'))     return 'next';
+  return 'todo';
 }
 
-function arreterScan(){
-  if(!scanner||!enScan) return;
-  scanner.stop().then(()=>{scanner.clear();enScan=false;document.getElementById('btnScan').disabled=!phase;document.getElementById('btnStop').disabled=true;});
+/* ============================================================
+   3. CARTE
+   ============================================================ */
+const map = L.map('map',{zoomControl:true,attributionControl:true}).setView([18.95,-72.6],8);
+L.control.attribution({prefix:false}).addTo(map);
+
+const BASEMAPS = {
+  sombre:{layer:L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap · © CARTO',maxZoom:19}),dark:true},
+  clair:{layer:L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap · © CARTO',maxZoom:19}),dark:false},
+  satellite:{layer:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'© Esri · Maxar',maxZoom:19}),dark:true},
+  routier:{layer:L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}),dark:false},
+  topo:{layer:L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{attribution:'© OpenTopoMap',maxZoom:17}),dark:false},
+  humanitaire:{layer:L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap · HOT',maxZoom:19}),dark:false}
+};
+let baseActuel='routier';
+BASEMAPS[baseActuel].layer.addTo(map);
+document.getElementById('map').style.background = BASEMAPS[baseActuel].dark ? '#060a12' : '#e8eef4';
+function changerBasemap(cle){
+  if(!BASEMAPS[cle] || cle===baseActuel) return;
+  map.removeLayer(BASEMAPS[baseActuel].layer);
+  BASEMAPS[cle].layer.addTo(map);
+  BASEMAPS[cle].layer.bringToBack();
+  baseActuel=cle;
+  document.getElementById('map').style.background = BASEMAPS[cle].dark ? '#060a12' : '#e8eef4';
 }
 
-let dernierScan=0;
-function onScan(texte){
-  const maintenant=Date.now();
-  if(maintenant-dernierScan<2500||scanEnAttente) return;
-  dernierScan=maintenant;
-  if(!phase){toast('Type de scan non sélectionné.','warn');return;}
-  if(!position){toast('Position GPS non fixée — patiente.','warn');return;}
-  const code=String(texte||'').trim();
-  if(!code){toast('Code QR vide ou invalide.','err');return;}
-  scanEnAttente={code_centre:code,phase,convoi:CONVOI,agent:AGENT,lat:position.lat,lng:position.lng,acc:position.acc,timestamp:new Date().toISOString()};
-  ouvrirConfirmation(scanEnAttente);
+
+/* Mode automatique : jour de 06:00 à 17:59, nuit de 18:00 à 05:59. */
+const THEME_STORAGE_KEY='pc_convois_theme';
+let themePreference=localStorage.getItem(THEME_STORAGE_KEY)||'auto';
+let themeEffectif='night';
+
+function heureHaiti(date=new Date()){
+  return new Date(date.toLocaleString('en-US',{timeZone:'America/Port-au-Prince'}));
+}
+function estHeureDeJour(date=new Date()){
+  const h=heureHaiti(date).getHours();
+  return h>=6 && h<18;
+}
+function synchroniserBoutonsTheme(){
+  document.querySelectorAll('.theme-btn').forEach(btn=>{
+    btn.classList.toggle('active',btn.dataset.theme===themePreference);
+  });
+}
+function appliquerTheme(mode=themePreference,forcerFond=true){
+  themePreference=['auto','day','night'].includes(mode)?mode:'auto';
+  localStorage.setItem(THEME_STORAGE_KEY,themePreference);
+  const effectif=themePreference==='auto'?(estHeureDeJour()?'day':'night'):themePreference;
+  themeEffectif=effectif;
+  document.body.classList.toggle('theme-day',effectif==='day');
+  document.body.classList.toggle('theme-night',effectif==='night');
+  document.documentElement.style.colorScheme=effectif==='day'?'light':'dark';
+  synchroniserBoutonsTheme();
+
+  if(forcerFond){
+    changerBasemap(effectif==='day'?'routier':'sombre');
+    document.querySelectorAll('.bm-btn').forEach(b=>b.classList.toggle('active',b.dataset.bm===baseActuel));
+  }
 }
 
-function ouvrirConfirmation(scan){
-  const dep=scan.phase==='depart';
-  maj('modalIcon',dep?'🚚':'📍');
-  maj('modalTitle',dep?'Confirmer le DÉPART':'Confirmer l’ARRIVÉE');
-  maj('modalText',`Code scanné : ${scan.code_centre}`);
-  const box=document.getElementById('modalPhase');
-  box.className=`confirm-box ${scan.phase}`;
-  box.textContent=dep?'DÉPART DE LA BASE DÉPARTEMENTALE':'ARRIVÉE AU CENTRE DE VOTE';
-  const btn=document.getElementById('btnConfirm');
-  btn.className=`btn confirm ${scan.phase}`;
-  btn.textContent=dep?'Confirmer le départ':'Confirmer l’arrivée';
-  document.getElementById('confirmModal').classList.add('show');
-  if(navigator.vibrate) navigator.vibrate([80,50,80]);
+document.querySelectorAll('.theme-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>appliquerTheme(btn.dataset.theme,true));
+});
+
+/* Vérification périodique afin que le mode automatique bascule sans recharger la page. */
+setInterval(()=>{
+  if(themePreference!=='auto') return;
+  const attendu=estHeureDeJour()?'day':'night';
+  if(attendu!==themeEffectif) appliquerTheme('auto',true);
+},60000);
+
+appliquerTheme(themePreference,true);
+
+const couches = {
+  centres:L.layerGroup().addTo(map),
+  trajets:L.layerGroup().addTo(map),
+  positions:L.layerGroup().addTo(map),
+  routes:L.layerGroup().addTo(map),
+  labels:L.layerGroup().addTo(map),
+};
+let heatLayer=null, heatOn=false, markerByConvoi={};
+const routeCache={};
+const LABEL_MIN_ZOOM=10;
+
+function mettreAJourVisibiliteNoms(){
+  const ctl=document.getElementById('lyLabels');
+  const ok=ctl && ctl.checked && map.getZoom()>=LABEL_MIN_ZOOM;
+  if(ok){ if(!map.hasLayer(couches.labels)) couches.labels.addTo(map); }
+  else if(map.hasLayer(couches.labels)) map.removeLayer(couches.labels);
 }
 
-function annulerConfirmation(){scanEnAttente=null;document.getElementById('confirmModal').classList.remove('show');toast('Scan annulé.','warn');}
-function confirmerScan(){
-  if(!scanEnAttente) return;
-  const scan=scanEnAttente;scanEnAttente=null;
-  document.getElementById('confirmModal').classList.remove('show');
-  ajouterFile(scan);envoyerFile();
-  toast(`${scan.phase==='depart'?'DÉPART enregistré':'ARRIVÉE enregistrée'} · ${scan.code_centre}`,'ok');
+const lyMap={centres:'lyCentres',trajets:'lyTrajets',positions:'lyPositions',routes:'lyRoutes',labels:'lyLabels'};
+Object.entries(lyMap).forEach(([k,id])=>{
+  document.getElementById(id).addEventListener('change',e=>{
+    if(k==='labels'){ mettreAJourVisibiliteNoms(); return; }
+    if(e.target.checked){ couches[k].addTo(map); if(k==='routes'){couches.routes.clearLayers();dessinerRoutesRealistes(view);} }
+    else map.removeLayer(couches[k]);
+  });
+});
+document.querySelectorAll('.bm-btn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.bm-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); changerBasemap(b.dataset.bm);
+  });
+});
+
+/* ============================================================
+   4. CHARGEMENT BACKEND
+   ============================================================ */
+async function chargerDonnees(){
+  const chip=document.getElementById('syncChip'), txt=document.getElementById('syncText');
+  chip.classList.remove('err'); txt.textContent='Chargement…';
+  try{
+    const res=await fetch(ENDPOINT_URL+'&_='+Date.now(),{cache:'no-store'});
+    const data=await res.json();
+    allConvois=data.convois||[];
+    remplirDepartements(); remplirConvoisSolo(); appliquerFiltres();
+    const h=data.timestamp?new Date(data.timestamp).toLocaleTimeString('fr-FR',{timeZone:'America/Port-au-Prince'}):new Date().toLocaleTimeString('fr-FR',{timeZone:'America/Port-au-Prince'});
+    txt.innerHTML='Sync <b>'+h+'</b>';
+  }catch(err){
+    chip.classList.add('err'); txt.textContent='Erreur de connexion';
+    console.error(err);
+  }
 }
 
-function lireFile(){try{return JSON.parse(localStorage.getItem(CLE_FILE))||[]}catch{return[]}}
-function ecrireFile(f){localStorage.setItem(CLE_FILE,JSON.stringify(f));rendreFile()}
-function ajouterFile(scan){const f=lireFile();scan._id=Date.now()+'_'+Math.random().toString(36).slice(2,7);scan._envoye=false;f.push(scan);ecrireFile(f)}
-async function envoyerFile(){
-  if(!navigator.onLine)return;
-  const f=lireFile(),attente=f.filter(s=>!s._envoye);
-  for(const scan of attente){try{await fetch(URL_APPS_SCRIPT,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(scan)});scan._envoye=true}catch(e){}}
-  const seuil=Date.now()-5*60*1000;ecrireFile(f.filter(s=>!s._envoye||parseInt(s._id)>seuil));
+/* ============================================================
+   5. FILTRES
+   ============================================================ */
+function remplirConvoisSolo(){
+  const sel=document.getElementById('fConvoiSolo'); if(!sel) return;
+  const cur=sel.value;
+  const items=allConvois.filter(c=>c&&c.id&&(missionMode==='all'||typeMission(c)===missionMode)).map(c=>({id:c.id,label:displayName(c)+' — '+c.id})).sort((a,b)=>a.label.localeCompare(b.label,'fr'));
+  sel.innerHTML='<option value="">Tous les convois</option>';
+  items.forEach(it=>{const o=document.createElement('option');o.value=it.id;o.textContent=it.label;sel.appendChild(o);});
+  if(items.some(it=>it.id===cur)) sel.value=cur;
 }
-function rendreFile(){
-  const f=lireFile(),nb=f.filter(s=>!s._envoye).length;maj('fileCount',nb+' en attente');
-  const box=document.getElementById('fileListe');
-  if(!f.length){box.innerHTML='<div class="vide">Aucun scan pour l\'instant</div>';return;}
-  box.innerHTML=f.slice(-8).reverse().map(s=>{const env=s._envoye;const badge=env?`<span class="badge ${s.phase}">${s.phase==='depart'?'DÉPART':'ARRIVÉE'}</span>`:'<span class="badge attente">EN ATTENTE</span>';const h=new Date(s.timestamp).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});return `<div class="item">${badge}<span class="code">${echapperHTML(s.code_centre)}</span><span class="meta">${h}<br>${env?'envoyé':'hors ligne'}</span></div>`}).join('');
+function remplirDepartements(){
+  const sel=document.getElementById('fDep'), cur=sel.value;
+  const deps=[...new Set(allConvois.filter(c=>missionMode==='all'||typeMission(c)===missionMode).map(c=>c.departement).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Tous les départements</option>';
+  deps.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;sel.appendChild(o);});
+  sel.value=cur;
 }
-function majReseau(){const el=document.getElementById('reseau');if(navigator.onLine){el.className='on';el.textContent='En ligne';envoyerFile()}else{el.className='off';el.textContent='Hors ligne'}}
-window.addEventListener('online',majReseau);window.addEventListener('offline',majReseau);
-function maj(id,txt){document.getElementById(id).textContent=txt}
-function echapperHTML(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-let toastTimer;function toast(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+type;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.className='toast '+type,2800)}
+function appliquerFiltres(){
+  const q=document.getElementById('fSearch').value.toLowerCase();
+  const dep=document.getElementById('fDep').value;
+  const solo=document.getElementById('fConvoiSolo')?document.getElementById('fConvoiSolo').value:'';
+  const statutFiltre=document.getElementById('fStatut')?document.getElementById('fStatut').value:'';
+  view=allConvois.filter(c=>{
+    const nom=(c.nom||c.id||'').toLowerCase(), id=(c.id||'').toLowerCase();
+    if(missionMode!=='all' && typeMission(c)!==missionMode) return false;
+    if(solo && c.id!==solo) return false;
+    if(statutFiltre && classify(c.statutGlobal).key!==statutFiltre) return false;
+    if(q && !id.includes(q) && !nom.includes(q)) return false;
+    if(dep && c.departement!==dep) return false;
+    return true;
+  });
+  renderMap(view); renderList(view); refreshKPIs(view);
+  const mb=document.getElementById('mapBadgeSub'); if(mb){const deps=new Set(view.map(c=>c.departement).filter(Boolean)).size;mb.textContent=`${deps} département${deps>1?'s':''} · ${view.length} mission${view.length>1?'s':''} affichée${view.length>1?'s':''}`;}
+  if(heatOn) rebuildHeat();
+  if(solo && view.length===1) setTimeout(()=>zoomConvoi(view[0]),250);
+}
+['fSearch','fDep','fConvoiSolo','fStatut'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',appliquerFiltres);});
+document.querySelectorAll('.mission-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    missionMode=btn.dataset.mode||'all';
+    document.querySelectorAll('.mission-btn').forEach(b=>b.classList.toggle('active',b===btn));
+    remplirConvoisSolo();
+    appliquerFiltres();
+  });
+});
+document.getElementById('btnResetFilters').onclick=()=>{
+  document.getElementById('fSearch').value='';document.getElementById('fDep').value='';
+  if(document.getElementById('fConvoiSolo'))document.getElementById('fConvoiSolo').value='';
+  if(document.getElementById('fStatut'))document.getElementById('fStatut').value='';
+  appliquerFiltres();
+};
 
-suivreGPS();majReseau();rendreFile();setInterval(envoyerFile,20000);if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+/* ============================================================
+   6. RENDU CARTE
+   ============================================================ */
+function calculerCapConvoi(c){
+  const pts=(c.trajet||[]).filter(p=>p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon))).slice(-8);
+  if(pts.length<2) return 0;
+  let p2=pts[pts.length-1], p1=null;
+  for(let i=pts.length-2;i>=0;i--){
+    if(Math.abs(Number(pts[i].lat)-Number(p2.lat))>0.00001 || Math.abs(Number(pts[i].lon)-Number(p2.lon))>0.00001){p1=pts[i];break;}
+  }
+  if(!p1) return 0;
+  const toRad=Math.PI/180, toDeg=180/Math.PI;
+  const lat1=Number(p1.lat)*toRad, lat2=Number(p2.lat)*toRad, dLon=(Number(p2.lon)-Number(p1.lon))*toRad;
+  const y=Math.sin(dLon)*Math.cos(lat2), x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLon);
+  return (Math.atan2(y,x)*toDeg+360)%360;
+}
+function svgConvoiIcon(c,cl){
+  const lost=cl.key==='lost'?'lost-marker':'';
+  const n=Number(c.completees)||0, tot=Number(c.total)||0;
+  const pct=tot?Math.min(100,Math.round(n/tot*100)):0;
+  const cap=calculerCapConvoi(c);
+  const ringColor=cl.key==='done'?'#25d07d':(cl.key==='partial'?'#a06bff':(cl.key==='lost'?'#ff3b5c':'#3d9bff'));
+  const ringBg=`conic-gradient(${ringColor} ${pct*3.6}deg, rgba(255,255,255,.14) ${pct*3.6}deg)`;
+  const truckSvg=`<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5.5A1.5 1.5 0 0 1 4.5 4h9A1.5 1.5 0 0 1 15 5.5V8h2.6c.5 0 .97.25 1.25.67l1.9 2.85c.16.24.25.53.25.82V17h-1.25a2.75 2.75 0 0 1-5.5 0h-4.5a2.75 2.75 0 0 1-5.5 0H3V5.5Zm12 4V14h4v-1.35L17.23 10H15ZM7 18.25A1.25 1.25 0 1 0 7 15.75a1.25 1.25 0 0 0 0 2.5Zm10 0a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z"/></svg>`;
+  const mini=cl.key==='done'?'✓':(cl.key==='partial'?'↩':(cl.key==='lost'?'!':''));
+  const miniHtml=mini?`<span class="status-mini">${mini}</span>`:'';
+  return L.divIcon({className:'',iconSize:[40,40],iconAnchor:[20,20],
+    html:`<div class="cv-ring ${lost}" style="width:40px;height:40px;background:${ringBg}" title="Progression : ${pct}%">
+      <div class="cv-marker" style="width:30px;height:30px;background:${cl.color};color:#04101f">
+        <span class="truck-heading" style="transform:rotate(${cap}deg)">${truckSvg}</span>${miniHtml}
+      </div></div>`});
+}
+function dispatchOffsets(list){
+  const offset={}, groupes={};
+  list.filter(c=>c.positionActuelle&&c.positionActuelle.lat!=null).forEach(c=>{
+    const key=c.positionActuelle.lat.toFixed(3)+'_'+c.positionActuelle.lon.toFixed(3);
+    (groupes[key]=groupes[key]||[]).push(c);
+  });
+  Object.values(groupes).forEach(g=>{
+    if(g.length===1){offset[g[0].id]=[g[0].positionActuelle.lat,g[0].positionActuelle.lon];return;}
+    const Rpx=26;
+    g.forEach((c,i)=>{
+      const a=2*Math.PI*i/g.length;
+      const pt=map.latLngToContainerPoint([c.positionActuelle.lat,c.positionActuelle.lon]);
+      const ll=map.containerPointToLatLng([pt.x+Rpx*Math.cos(a),pt.y+Rpx*Math.sin(a)]);
+      offset[c.id]=[ll.lat,ll.lng];
+    });
+  });
+  return offset;
+}
+
+/* --- OSRM + nettoyage GPS --- */
+const OSRM_ROUTE='https://router.project-osrm.org/route/v1/driving/';
+function distM(a,b){
+  const R=6371000, p1=a[0]*Math.PI/180, p2=b[0]*Math.PI/180;
+  const dp=(b[0]-a[0])*Math.PI/180, dl=(b[1]-a[1])*Math.PI/180;
+  const x=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+function fmtKm(m){if(!isFinite(m)||m<0)return'—';return m>=1000?(m/1000).toFixed(2)+' km':Math.round(m)+' m';}
+function fmtDuree(ms){if(!isFinite(ms)||ms<0)return'—';const t=Math.round(ms/60000),h=Math.floor(t/60),m=t%60;return h>0?h+' h '+String(m).padStart(2,'0')+' min':m+' min';}
+function fmtDateHeure(t){if(!t)return'—';return new Date(t).toLocaleString('fr-FR');}
+function distancePolylineM(l){let d=0;for(let i=1;i<l.length;i++)d+=distM(l[i-1],l[i]);return d;}
+function statsSegment(rawPts,routePts){
+  const g=rawPts.map(p=>[p.lat,p.lon]);
+  const dGps=distancePolylineM(g);
+  const dRoute=routePts&&routePts.length>1?distancePolylineM(routePts):null;
+  const t0=rawPts[0]?.time||null, t1=rawPts[rawPts.length-1]?.time||null;
+  const dureeMs=(t0&&t1)?(t1-t0):null;
+  const vitesseGps=dureeMs&&dGps?(dGps/1000)/(dureeMs/3600000):null;
+  const vitesseRoute=dureeMs&&dRoute?(dRoute/1000)/(dureeMs/3600000):null;
+  return {dGps,dRoute,t0,t1,dureeMs,vitesseGps,vitesseRoute,nb:rawPts.length};
+}
+function htmlStatsTrajet(c,rawPts,routePts,typeTrace){
+  const st=statsSegment(rawPts,routePts), nom=displayName(c);
+  const dR=st.dRoute!=null?`<br>Distance route OSM : <b>${fmtKm(st.dRoute)}</b>`:'';
+  const vR=st.vitesseRoute!=null?`<br>Vitesse moyenne route : <b>${st.vitesseRoute.toFixed(1)} km/h</b>`:'';
+  const vG=st.vitesseGps!=null?`<br>Vitesse moyenne GPS : <b>${st.vitesseGps.toFixed(1)} km/h</b>`:'';
+  return `<div class="popup-title">${nom}</div>Type de tracé : <b>${typeTrace}</b><br>Points soumis : <b>${st.nb}</b><br>Distance GPS cumulée : <b>${fmtKm(st.dGps)}</b>${dR}<br>Durée réelle : <b>${fmtDuree(st.dureeMs)}</b><br>Début : ${fmtDateHeure(st.t0)}<br>Fin : ${fmtDateHeure(st.t1)}${vG}${vR}`;
+}
+function nettoyerEtSegmenterTrajetDetail(points){
+  if(!points||points.length<2) return [];
+  const pts=points.filter(p=>p&&p.lat!=null&&p.lon!=null).map(p=>({lat:Number(p.lat),lon:Number(p.lon),time:p.time?new Date(p.time).getTime():null,acc:p.acc!=null&&p.acc!==''?Number(p.acc):null,source:p.source||''})).filter(p=>!isNaN(p.lat)&&!isNaN(p.lon)).filter(p=>p.acc==null||isNaN(p.acc)||p.acc<=MAX_ACC_M).sort((a,b)=>(a.time||0)-(b.time||0));
+  if(pts.length<2) return [];
+  const segments=[]; let seg=[];
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i];
+    if(seg.length===0){seg.push(p);continue;}
+    const prev=seg[seg.length-1];
+    const d=distM([prev.lat,prev.lon],[p.lat,p.lon]);
+    const dtMin=(prev.time&&p.time)?Math.max((p.time-prev.time)/60000,0.016):null;
+    const vKmh=dtMin?(d/1000)/(dtMin/60):0;
+    if(d<MIN_POINT_DIST_M) continue;
+    const sautCourt=dtMin!=null&&dtMin<=MAX_SHORT_GAP_MIN&&d>MAX_JUMP_M;
+    const vitesseIrrealiste=dtMin!=null&&vKmh>MAX_SPEED_KMH;
+    if(sautCourt||vitesseIrrealiste){ if(seg.length>=2)segments.push({raw:seg,latlngs:seg.map(x=>[x.lat,x.lon])}); seg=[p]; }
+    else seg.push(p);
+  }
+  if(seg.length>=2) segments.push({raw:seg,latlngs:seg.map(x=>[x.lat,x.lon])});
+  return segments;
+}
+function echantillonner(pts,maxN){if(pts.length<=maxN)return pts;const step=(pts.length-1)/(maxN-1),out=[];for(let i=0;i<maxN;i++)out.push(pts[Math.round(i*step)]);return out;}
+async function fetchJSON(url,ms){
+  const ctrl=new AbortController(), to=setTimeout(()=>ctrl.abort(),ms||6000);
+  try{const res=await fetch(url,{signal:ctrl.signal});clearTimeout(to);if(!res.ok)return null;return await res.json();}
+  catch(e){clearTimeout(to);return null;}
+}
+async function itineraireAB(a,b){
+  const coords=a[1].toFixed(6)+','+a[0].toFixed(6)+';'+b[1].toFixed(6)+','+b[0].toFixed(6);
+  const url=OSRM_ROUTE+coords+'?overview=full&geometries=geojson&alternatives=false&steps=false';
+  const data=await fetchJSON(url,7000);
+  if(data&&data.code==='Ok'&&data.routes&&data.routes[0]) return data.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+  return null;
+}
+async function routeOSRM(convoiId,segment,segIndex){
+  const cacheKey=convoiId+'_'+segIndex+'_'+segment.length+'_'+segment[0].join(',')+'_'+segment[segment.length-1].join(',');
+  if(routeCache[cacheKey]!==undefined) return routeCache[cacheKey];
+  const ech=echantillonner(segment,18), trace=[];
+  for(let i=0;i<ech.length-1;i++){
+    const seg=await itineraireAB(ech[i],ech[i+1]);
+    if(seg&&seg.length>1){if(trace.length>0)seg.shift();trace.push(...seg);}
+    else{if(trace.length===0)trace.push(ech[i]);trace.push(ech[i+1]);}
+  }
+  routeCache[cacheKey]=trace.length>1?trace:null;
+  return routeCache[cacheKey];
+}
+async function dessinerRoutesRealistes(list){
+  if(!document.getElementById('lyRoutes').checked) return;
+  const token=Date.now(); couches.routes._token=token;
+  for(const c of list){
+    if(couches.routes._token!==token) return;
+    if(!c.trajet||c.trajet.length<2) continue;
+    const cl=classify(c.statutGlobal);
+    const segments=nettoyerEtSegmenterTrajetDetail(c.trajet);
+    for(let i=0;i<segments.length;i++){
+      const line=await routeOSRM(c.id,segments[i].latlngs,i);
+      if(couches.routes._token!==token) return;
+      if(line&&line.length>1){
+        const bord=L.polyline(line,{color:'#020509',weight:8,opacity:.6,lineCap:'round',lineJoin:'round'});
+        const route=L.polyline(line,{color:cl.color,weight:5,opacity:1,lineCap:'round',lineJoin:'round'});
+        route.bindPopup(htmlStatsTrajet(c,segments[i].raw,line,'route réaliste OSM'));
+        couches.routes.addLayer(bord); couches.routes.addLayer(route);
+        if(typeof L.polylineDecorator==='function'){
+          const fleches=L.polylineDecorator(route,{patterns:[{offset:'8%',repeat:'12%',symbol:L.Symbol.arrowHead({pixelSize:8,polygon:false,pathOptions:{stroke:true,color:'#ffffff',weight:2,opacity:.9}})}]});
+          couches.routes.addLayer(fleches);
+        }
+      }
+    }
+  }
+}
+
+function renderMap(list){
+  Object.values(couches).forEach(c=>c.clearLayers());
+  markerByConvoi={};
+  const bounds=[], offset=dispatchOffsets(list);
+  list.forEach(c=>{
+    const cl=classify(c.statutGlobal);
+    if(c.positionActuelle&&c.positionActuelle.lat!=null){
+      const real=[c.positionActuelle.lat,c.positionActuelle.lon];
+      const disp=offset[c.id]||real;
+      if(disp[0]!==real[0]||disp[1]!==real[1]) couches.positions.addLayer(L.polyline([real,disp],{color:cl.color,weight:1.5,opacity:.5,dashArray:'2 3'}));
+      const m=L.marker(disp,{icon:svgConvoiIcon(c,cl)});
+      const lostTxt=cl.key==='lost'?`<br><b style="color:#ff3b5c">Inactif depuis ${c.inactiveMin||0} min</b>`:'';
+      m.bindPopup(`<div class="popup-title">${displayLabel(c)}</div>${c.id||''}<br>${c.departement||''} · ${c.commune||''}<br>Statut : ${cl.label}<br>Progression : ${c.completees||0}/${c.total||0}${lostTxt}`);
+      m.on('click',()=>openDrawer(c));
+      couches.positions.addLayer(m);
+      markerByConvoi[c.id]=m;
+      const label=L.tooltip({permanent:true,direction:'right',offset:[16,0],className:'cv-label'}).setLatLng(disp).setContent(displayLabel(c));
+      couches.labels.addLayer(label);
+      bounds.push(real);
+    }
+    const parCentre={};
+    (c.etapes||[]).forEach(e=>{
+      if(e.lat==null) return;
+      const key=(e.codeCentre&&String(e.codeCentre).trim())||(e.lat.toFixed(6)+'_'+e.lon.toFixed(6));
+      if(!parCentre[key]) parCentre[key]={lat:e.lat,lon:e.lon,nom:e.nomCentre,aller:null,retour:null,autres:[]};
+      const ph=String(e.phase||'').toUpperCase();
+      if(ph==='ALLER'&&!parCentre[key].aller) parCentre[key].aller=e;
+      else if(ph==='RETOUR'&&!parCentre[key].retour) parCentre[key].retour=e;
+      else parCentre[key].autres.push(e);
+    });
+    Object.values(parCentre).forEach(ct=>{
+      const a=ct.aller, r=ct.retour;
+      const aCls=a?classifyEtape(a.statut):'todo';
+      const rCls=r?classifyEtape(r.statut):null;
+      const aText=String(a?.statut||'').toUpperCase(), rText=String(r?.statut||'').toUpperCase();
+      const isProblem=aText.includes('ERREUR')||rText.includes('ERREUR')||aText.includes('ANOMAL')||rText.includes('ANOMAL')||aText.includes('SIGNAL')||rText.includes('SIGNAL');
+      const retourEnCours=r&&rCls!=='done'&&(rCls==='place'||rCls==='next'||rText.includes('RETOUR À EFFECTUER'));
+      const onlyProblems=document.getElementById('lyProblems')?.checked;
+      if(onlyProblems&&!isProblem&&aCls!=='court'&&rCls!=='court'&&rCls!=='place') return;
+      let mainCls='cm', glyph='';
+      const ordre=a?(a.ordre||''):(r?(r.ordre||''):'');
+      if(isProblem){mainCls+=' problem';glyph='!';}
+      else if(aCls==='done'&&rCls==='done'){mainCls+=' mission-done';glyph='✓';}
+      else if(retourEnCours){mainCls+=' returning';glyph='↩';}
+      else if(aCls==='done'){mainCls+=' a-done';glyph='A';}
+      else if(aCls==='next'){mainCls+=' a-next';glyph=String(ordre||'•');}
+      else if(aCls==='place'){mainCls+=' a-place';glyph='●';}
+      else if(aCls==='court'){mainCls+=' a-court';glyph='⚡';}
+      else{mainCls+=' a-todo';glyph=String(ordre||'○');}
+      let cornerHtml='';
+      if(r&&!(aCls==='done'&&rCls==='done')){
+        let rc=' pending';
+        if(rCls==='done')rc=' done';
+        else if(rCls==='place'||retourEnCours)rc=' place';
+        cornerHtml=`<span class="r${rc}"></span>`;
+      }
+      const icon=L.divIcon({className:'',iconSize:[32,32],iconAnchor:[16,16],html:`<div class="cm-wrap"><div class="${mainCls}"><span class="cm-glyph">${glyph}</span>${cornerHtml}</div></div>`});
+      const m=L.marker([ct.lat,ct.lon],{icon});
+      let phasesHtml='';
+      let statutVisuel='';
+      if(estTrajetSimple(c)){
+        const eTrajet=a||ct.autres[0]||r;
+        if(eTrajet){
+          phasesHtml+=`<span class="popup-phase">TRAJET ${eTrajet.ordre||''}</span> ${eTrajet.statut||'À venir'}<br>`;
+          statutVisuel=isProblem?'Étape à surveiller':libelleEtapeCarte(c,eTrajet);
+        }else{
+          phasesHtml='Aucune étape planifiée<br>';
+          statutVisuel='Étape du trajet';
+        }
+      }else{
+        if(a) phasesHtml+=`<span class="popup-phase">ALLER ${a.ordre||''}</span> ${a.statut||'À venir'}<br>`;
+        if(r) phasesHtml+=`<span class="popup-phase retour">RETOUR ${r.ordre||''}</span> ${r.statut||'En attente'}<br>`;
+        if(!a&&!r) phasesHtml='Aucune phase planifiée<br>';
+        statutVisuel=isProblem?'Étape à surveiller':(aCls==='done'&&rCls==='done'?'Aller et retour complétés':(retourEnCours?'Retour en cours':(aCls==='done'?'Aller complété':(aCls==='place'?'Convoi sur place':(aCls==='next'?'Prochaine étape':'Étape à venir')))));
+      }
+      const nomMission=displayName(c)||c.nom||c.id;
+      m.bindPopup(`<div class="popup-title">${ct.nom||'Centre'}</div><b>${statutVisuel}</b><br>${estTrajetSimple(c)?'Trajet':'Convoi'} : ${nomMission}<br>${phasesHtml}`);
+      m.bindTooltip(`${ct.nom||'Centre'} · ${statutVisuel}`,{direction:'top',offset:[0,-12],className:'cv-label'});
+      couches.centres.addLayer(m);
+      bounds.push([ct.lat,ct.lon]);
+    });
+    if(c.trajet&&c.trajet.length>1){
+      const segments=nettoyerEtSegmenterTrajetDetail(c.trajet);
+      segments.forEach(seg=>{
+        const pts=seg.latlngs;
+        if(pts.length>1){
+          const pl=L.polyline(pts,{color:cl.color,weight:2,opacity:.42,dashArray:'4 4',lineCap:'round'});
+          pl.bindPopup(htmlStatsTrajet(c,seg.raw,null,'points GPS soumis'));
+          couches.trajets.addLayer(pl);
+        }
+      });
+    }
+  });
+  if(list.length<=5&&bounds.length>0) map.fitBounds(bounds,{padding:[60,60],maxZoom:15});
+  couches.routes.clearLayers();
+  dessinerRoutesRealistes(list);
+}
+
+/* ============================================================
+   7. LISTE — groupée par département, alertes en tête
+   ============================================================ */
+function renderList(list){
+  const wrap=document.getElementById('convList'); wrap.innerHTML='';
+  if(!list.length){wrap.innerHTML='<div class="empty">Aucune mission correspondante</div>';document.getElementById('convCount').textContent='0';return;}
+  const groupes={};
+  list.forEach(c=>{const dep=c.departement||'Autre';(groupes[dep]=groupes[dep]||[]).push(c);});
+  Object.keys(groupes).sort((a,b)=>a.localeCompare(b,'fr')).forEach(dep=>{
+    const convois=groupes[dep].sort((a,b)=>{
+      const la=classify(a.statutGlobal).key==='lost'?0:1, lb=classify(b.statutGlobal).key==='lost'?0:1;
+      return la-lb || displayName(a).localeCompare(displayName(b),'fr');
+    });
+    const head=document.createElement('div');
+    head.className='dep-head';
+    head.innerHTML=`${dep}<span class="n">${convois.length}</span>`;
+    wrap.appendChild(head);
+    convois.forEach(c=>{
+      const cl=classify(c.statutGlobal);
+      const el=document.createElement('div');
+      el.className='conv'+(cl.key==='lost'?' is-lost':'');
+      el.dataset.id=c.id;
+      el.innerHTML=`<span class="pin" style="background:${cl.color}"></span>
+        <div class="meta"><div class="name">${typeMission(c)==='trajet'?'🚗 ':'🚛 '}${displayName(c)}</div>
+        <div class="info"><span class="mono" style="opacity:.6">${c.id||''}</span><span class="mono">${c.completees||0}/${c.total||0}</span></div></div>
+        <span class="st ${cl.cls}">${cl.label}</span>`;
+      el.onclick=()=>{openDrawer(c);zoomConvoi(c);document.querySelectorAll('.conv').forEach(x=>x.classList.remove('active'));el.classList.add('active');};
+      wrap.appendChild(el);
+    });
+  });
+  document.getElementById('convCount').textContent=list.length;
+}
+function zoomConvoi(c){
+  const b=[];
+  if(c.positionActuelle&&c.positionActuelle.lat) b.push([c.positionActuelle.lat,c.positionActuelle.lon]);
+  (c.etapes||[]).forEach(e=>{if(e.lat!=null)b.push([e.lat,e.lon]);});
+  (c.trajet||[]).forEach(p=>{if(p.lat!=null)b.push([p.lat,p.lon]);});
+  if(b.length) map.fitBounds(b,{padding:[80,80],maxZoom:16});
+  markerByConvoi[c.id]?.openPopup();
+}
+
+/* ============================================================
+   8. KPIs + verdict système + panneau d'alertes
+   ============================================================ */
+function refreshKPIs(list){
+  const active=list.length;
+  const live=list.filter(c=>{const k=classify(c.statutGlobal).key;return k==='live'||k==='partial'||k==='allerDone';}).length;
+  const lostList=list.filter(c=>classify(c.statutGlobal).key==='lost');
+  const lost=lostList.length;
+  const centres=list.reduce((s,c)=>s+(Number(c.completees)||0),0);
+  const totalEt=list.reduce((s,c)=>s+(Number(c.total)||0),0);
+  const cov=totalEt?Math.round(centres/totalEt*100):0;
+
+  let allerSeulement=0, allerRetourCompletes=0, retourEnCours=0;
+  list.forEach(c=>{
+    const parCentre={};
+    (c.etapes||[]).forEach(e=>{
+      const key=(e.codeCentre&&String(e.codeCentre).trim())||((e.lat!=null&&e.lon!=null)?`${Number(e.lat).toFixed(6)}_${Number(e.lon).toFixed(6)}`:'');
+      if(!key) return;
+      if(!parCentre[key]) parCentre[key]={aller:false,retour:false,retourCours:false};
+      const phase=String(e.phase||'').toUpperCase(), done=classifyEtape(e.statut)==='done';
+      if(phase==='ALLER'&&done) parCentre[key].aller=true;
+      if(phase==='RETOUR'&&done) parCentre[key].retour=true;
+      if(phase==='RETOUR'&&!done&&['place','next'].includes(classifyEtape(e.statut))) parCentre[key].retourCours=true;
+    });
+    Object.values(parCentre).forEach(x=>{
+      if(x.aller&&x.retour) allerRetourCompletes++;
+      else if(x.retourCours) retourEnCours++;
+      else if(x.aller) allerSeulement++;
+    });
+  });
+
+  document.getElementById('kActive').textContent=active;
+  document.getElementById('kLive').textContent=live;
+  document.getElementById('kLost').textContent=lost;
+  document.getElementById('kCentres').textContent=centres;
+  document.getElementById('lgAllerDone').textContent=allerSeulement;
+  document.getElementById('lgMissionDone').textContent=allerRetourCompletes;
+  document.getElementById('lgRetourCours').textContent=retourEnCours;
+  document.getElementById('lgLost').textContent=lost;
+  document.getElementById('covPct').textContent=cov+'%';
+  document.getElementById('covFill').style.width=cov+'%';
+  document.getElementById('covSub').textContent=`${centres} / ${totalEt} étapes complétées`;
+  document.getElementById('mapBadgeSub').textContent=`${active} convois · ${live} en route · ${lost} en alerte`;
+
+  /* verdict système — bandeau haut */
+  const sb=document.getElementById('statusbar'), vd=document.getElementById('verdict');
+  const vt=document.getElementById('verdictText'), vs=document.getElementById('verdictSub');
+  if(lost>0){
+    sb.classList.add('has-alert'); vd.classList.add('alert');
+    vt.textContent=`${lost} convoi${lost>1?'s':''} en alerte`;
+    vs.textContent=`${active} suivis · ${live} en route`;
+  }else{
+    sb.classList.remove('has-alert'); vd.classList.remove('alert');
+    vt.textContent='Situation nominale';
+    vs.textContent=`${active} convois suivis · ${cov}% couverts`;
+  }
+
+  /* panneau d'alertes latéral */
+  const box=document.getElementById('alertbox');
+  const alist=document.getElementById('alertList');
+  document.getElementById('alertCnt').textContent=lost;
+  if(lost>0){
+    box.classList.remove('calm'); box.classList.add('active');
+    alist.innerHTML='';
+    lostList.sort((a,b)=>(b.inactiveMin||0)-(a.inactiveMin||0)).forEach(c=>{
+      const el=document.createElement('div');
+      el.className='alert-item';
+      el.innerHTML=`<span class="ai-tri">!</span>
+        <div class="ai-body"><div class="ai-name">${displayName(c)}</div>
+        <div class="ai-meta">${c.departement||'—'} · ${c.completees||0}/${c.total||0} étapes</div></div>
+        <span class="ai-time">${c.inactiveMin!=null?c.inactiveMin+'′':'—'}</span>`;
+      el.onclick=()=>{openDrawer(c);zoomConvoi(c);};
+      alist.appendChild(el);
+    });
+  }else{
+    box.classList.remove('active'); box.classList.add('calm');
+    alist.innerHTML='';
+  }
+}
+
+/* ============================================================
+   9. DRAWER
+   ============================================================ */
+function stepHtml(e){
+  const k=classifyEtape(e.statut);
+  let cls='';
+  if(k==='done')cls='done';
+  else if(k==='place'||k==='next')cls='current';
+  else if(k==='court')cls='warnstep';
+  return `<div class="step ${cls}"><span class="node"></span><div class="name">${e.nomCentre||'Centre '+(e.ordre||'')}</div><div class="meta">Étape ${e.ordre||''} · ${e.statut||'à venir'}</div></div>`;
+}
+function selectionnerConvoiCarte(id){
+  Object.entries(markerByConvoi).forEach(([cid,m])=>{
+    const el=m&&m.getElement?m.getElement():null;
+    if(el) el.classList.toggle('cv-selected',cid===id);
+  });
+}
+function openDrawer(c){
+  selectionnerConvoiCarte(c.id);
+  const cl=classify(c.statutGlobal);
+  document.getElementById('drPin').style.background=cl.color;
+  document.getElementById('drName').textContent=displayName(c);
+  document.getElementById('drSub').textContent=`${c.id||''} · ${c.departement||''} · ${cl.label}`;
+  const done=Number(c.completees)||0, tot=Number(c.total)||0, pct=tot?Math.round(done/tot*100):0;
+  const inactif=c.inactiveMin!=null?c.inactiveMin+' min':'—';
+  const aller=(c.etapes||[]).filter(e=>String(e.phase||'').toUpperCase()==='ALLER').sort((x,y)=>(x.ordre||0)-(y.ordre||0));
+  const retour=(c.etapes||[]).filter(e=>String(e.phase||'').toUpperCase()==='RETOUR').sort((x,y)=>(x.ordre||0)-(y.ordre||0));
+  const autres=(c.etapes||[]).filter(e=>{const p=String(e.phase||'').toUpperCase();return p!=='ALLER'&&p!=='RETOUR';}).sort((x,y)=>(x.ordre||0)-(y.ordre||0));
+  const allerFait=aller.filter(e=>classifyEtape(e.statut)==='done').length;
+  const retourFait=retour.filter(e=>classifyEtape(e.statut)==='done').length;
+  let steps='';
+  if(estTrajetSimple(c)){
+    const trajet=[...aller,...autres].sort((x,y)=>(x.ordre||0)-(y.ordre||0));
+    const trajetFait=trajet.filter(e=>classifyEtape(e.statut)==='done').length;
+    if(trajet.length){steps+=`<div class="phase-label"><span class="chip">TRAJET ${trajetFait}/${trajet.length}</span></div><div class="dr-steps">${trajet.map(stepHtml).join('')}</div>`;}
+  }else{
+    if(aller.length){steps+=`<div class="phase-label"><span class="chip">ALLER ${allerFait}/${aller.length}</span></div><div class="dr-steps">${aller.map(stepHtml).join('')}</div>`;}
+    if(retour.length){steps+=`<div class="phase-label"><span class="chip retour">RETOUR ${retourFait}/${retour.length}</span></div><div class="dr-steps">${retour.map(stepHtml).join('')}</div>`;}
+    if(autres.length){steps+=`<div class="phase-label"><span class="chip">AUTRES</span></div><div class="dr-steps">${autres.map(stepHtml).join('')}</div>`;}
+  }
+  document.getElementById('drBody').innerHTML=`
+    <div class="dr-stat">
+      <div class="c"><div class="v">${done}/${tot}</div><div class="k">Étapes complétées</div></div>
+      <div class="c"><div class="v">${pct}<span style="font-size:12px">%</span></div><div class="k">Progression</div></div>
+      <div class="c"><div class="v" style="color:${cl.key==='lost'?'var(--alert)':'var(--ink)'}">${inactif}</div><div class="k">Inactivité</div></div>
+      <div class="c"><div class="v">${(c.etapes||[]).length}</div><div class="k">Étapes planifiées</div></div>
+    </div>
+    <div class="dr-prog">
+      <div class="cov-head"><span class="lbl">${estTrajetSimple(c)?'Progression du trajet':'Progression du convoi'}</span><span class="pct" style="font-size:18px">${pct}%</span></div>
+      <div class="cov-bar"><div class="cov-fill" style="width:${pct}%"></div></div>
+    </div>
+    <div class="s-label" style="margin-bottom:4px">Parcours</div>
+    ${steps||'<div class="empty">Aucune étape planifiée</div>'}`;
+  document.getElementById('drawer').classList.add('open');
+}
+document.getElementById('drClose').onclick=()=>{document.getElementById('drawer').classList.remove('open');selectionnerConvoiCarte('');};
+
+/* ============================================================
+   10. HEATMAP
+   ============================================================ */
+function rebuildHeat(){
+  if(heatLayer){map.removeLayer(heatLayer);heatLayer=null;}
+  const pts=[];
+  view.forEach(c=>(c.trajet||[]).forEach(p=>{if(p.lat!=null)pts.push([p.lat,p.lon,.6]);}));
+  heatLayer=L.heatLayer(pts,{radius:25,blur:20,maxZoom:12,gradient:{.2:'#1a6fa8',.5:'#3d9bff',.8:'#f5a524',1:'#ff3b5c'}}).addTo(map);
+}
+document.getElementById('btnHeat').onclick=function(){
+  heatOn=!heatOn;
+  if(heatOn){rebuildHeat();this.classList.add('on');}
+  else{if(heatLayer)map.removeLayer(heatLayer);heatLayer=null;this.classList.remove('on');}
+};
+
+/* ============================================================
+   11. TIMELINE
+   ============================================================ */
+const tl={open:false,playing:false,t:0,timer:null,tMin:null,tMax:null};
+let tlLayer=L.layerGroup().addTo(map);
+function computeTimeBounds(){
+  let lo=Infinity,hi=-Infinity;
+  view.forEach(c=>(c.trajet||[]).forEach(p=>{const t=new Date(p.time).getTime();if(!isNaN(t)){if(t<lo)lo=t;if(t>hi)hi=t;}}));
+  tl.tMin=isFinite(lo)?lo:null; tl.tMax=isFinite(hi)?hi:null;
+}
+function fmtClock(ms){if(ms==null)return'—';return new Date(ms).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});}
+document.getElementById('btnTimeline').onclick=function(){
+  tl.open=!tl.open; document.getElementById('timeline').classList.toggle('show',tl.open);
+  this.classList.toggle('on',tl.open);
+  if(tl.open){computeTimeBounds();setTL(0);}else stopTL();
+};
+function setTL(p){
+  tl.t=Math.max(0,Math.min(100,p));
+  document.getElementById('tlProg').style.width=tl.t+'%';
+  document.getElementById('tlKnob').style.left=tl.t+'%';
+  const cur=(tl.tMin!=null)?tl.tMin+(tl.tMax-tl.tMin)*tl.t/100:null;
+  document.getElementById('tlTime').textContent=fmtClock(cur);
+  animateTracks(cur);
+}
+function animateTracks(cur){
+  tlLayer.clearLayers();
+  if(!tl.open||cur==null) return;
+  view.forEach(c=>{
+    if(!c.trajet||c.trajet.length<2) return;
+    const cl=classify(c.statutGlobal);
+    const pts=c.trajet.filter(p=>p.lat!=null&&new Date(p.time).getTime()<=cur).map(p=>[p.lat,p.lon]);
+    if(pts.length>1){
+      tlLayer.addLayer(L.polyline(pts,{color:cl.color,weight:4,opacity:.9}));
+      tlLayer.addLayer(L.circleMarker(pts[pts.length-1],{radius:6,fillColor:cl.color,color:'#fff',weight:2,fillOpacity:1}));
+    }
+  });
+}
+function playTL(){tl.playing=true;document.getElementById('tlIcon').innerHTML='<rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/>';tl.timer=setInterval(()=>{if(tl.t>=100){stopTL();return;}setTL(tl.t+0.6);},50);}
+function stopTL(){tl.playing=false;clearInterval(tl.timer);tlLayer.clearLayers();document.getElementById('tlIcon').innerHTML='<path d="M8 5v14l11-7z"/>';}
+document.getElementById('tlPlay').onclick=()=>tl.playing?stopTL():playTL();
+document.getElementById('tlTrack').onclick=e=>{const r=e.currentTarget.getBoundingClientRect();setTL((e.clientX-r.left)/r.width*100);};
+
+/* ============================================================
+   12. ACTUALISER + horloge
+   ============================================================ */
+document.getElementById('btnRefresh').onclick=function(){this.style.opacity=.6;chargerDonnees().finally(()=>this.style.opacity=1);};
+setInterval(()=>{if(!document.hidden)chargerDonnees();},REFRESH_MS);
+function tickClock(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('fr-FR',{timeZone:'America/Port-au-Prince'});}
+setInterval(tickClock,1000); tickClock();
+
+/* ============================================================
+   13. COUCHE CONFIRMATION SCAN ELMS — inchangée
+   ============================================================ */
+const SCAN_ENDPOINT='https://script.google.com/macros/s/AKfycbwvtEB3ygCT9LzYM0YtGoFl09UMqf1hjOYUd0fm_usyZFv53KloRop3S6plYIAPTOQxag/exec?action=scans';
+const SCAN_REFRESH_MS=60000;
+const coucheScans=L.layerGroup().addTo(map);
+function iconeScan(s){
+  const livre=s.statut==='livre_confirme', alerte=s.conforme==='A_VERIFIER';
+  let couleur,symbole;
+  if(alerte){couleur='#ff3b5c';symbole='⚠';}
+  else if(livre){couleur='#25d07d';symbole='✓';}
+  else{couleur='#3d9bff';symbole='↑';}
+  return L.divIcon({className:'',iconSize:[22,22],iconAnchor:[11,11],html:`<div style="width:22px;height:22px;border-radius:50%;background:${couleur};color:#04101f;border:2px solid rgba(255,255,255,.9);display:grid;place-items:center;font-size:11px;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,.5)">${symbole}</div>`});
+}
+async function chargerScans(){
+  if(!document.getElementById('lyScans')||!document.getElementById('lyScans').checked) return;
+  try{
+    const res=await fetch(SCAN_ENDPOINT+'&_='+Date.now(),{cache:'no-store'});
+    const scans=await res.json();
+    if(!Array.isArray(scans)) return;
+    coucheScans.clearLayers();
+    scans.forEach(s=>{
+      const lat=s.arrivee_lat||s.depart_lat, lng=s.arrivee_lng||s.depart_lng;
+      if(!lat||!lng) return;
+      const depH=s.depart_ts?new Date(s.depart_ts).toLocaleString('fr-FR'):'—';
+      const arrH=s.arrivee_ts?new Date(s.arrivee_ts).toLocaleString('fr-FR'):'—';
+      const conf=s.conforme==='OUI'?'✓ conforme':s.conforme==='A_VERIFIER'?'⚠ écart '+(s.distance_m||'?')+' m':s.conforme==='SANS_REF'?'sans coord. de référence':'—';
+      L.marker([lat,lng],{icon:iconeScan(s)})
+        .bindPopup(`<div class="popup-title">${s.nom||s.code_centre}</div><span class="popup-phase">SCAN</span> confirmation de livraison<br>Code : ${s.code_centre}<br>${s.commune||''} · ${s.departement||''}<br>Convoi : ${s.convoi||'—'} · Agent : ${s.agent||'—'}<br>Départ scanné : ${depH}<br>Arrivée scannée : ${arrH}<br>Conformité : <b>${conf}</b>`)
+        .bindTooltip((s.nom||s.code_centre)+' · scan',{direction:'top',offset:[0,-10],className:'cv-label'})
+        .addTo(coucheScans);
+    });
+  }catch(err){console.error('Scans ELMS non chargés :',err);}
+}
+if(document.getElementById('lyScans')){
+  document.getElementById('lyScans').addEventListener('change',e=>{
+    if(e.target.checked){coucheScans.addTo(map);chargerScans();}
+    else map.removeLayer(coucheScans);
+  });
+}
+chargerScans();
+setInterval(()=>{if(!document.hidden)chargerScans();},SCAN_REFRESH_MS);
+
+/* ============================================================
+   14. BOOT + raccourcis + zoom adaptatif + légende
+   ============================================================ */
+chargerDonnees();
+
+const btnOnlyLive=document.getElementById('btnOnlyLive');
+if(btnOnlyLive) btnOnlyLive.addEventListener('click',()=>{const st=document.getElementById('fStatut'),solo=document.getElementById('fConvoiSolo');if(st)st.value='live';if(solo)solo.value='';appliquerFiltres();});
+const btnOnlyLost=document.getElementById('btnOnlyLost');
+if(btnOnlyLost) btnOnlyLost.addEventListener('click',()=>{const st=document.getElementById('fStatut'),solo=document.getElementById('fConvoiSolo');if(st)st.value='lost';if(solo)solo.value='';appliquerFiltres();});
+
+function fitNationalView(){
+  const bounds=[];
+  (view&&view.length?view:allConvois).forEach(c=>{
+    if(c.positionActuelle&&c.positionActuelle.lat!=null) bounds.push([c.positionActuelle.lat,c.positionActuelle.lon]);
+    (c.etapes||[]).forEach(e=>{if(e.lat!=null&&e.lon!=null)bounds.push([e.lat,e.lon]);});
+    (c.trajet||[]).forEach(p=>{if(p.lat!=null&&p.lon!=null)bounds.push([p.lat,p.lon]);});
+  });
+  if(bounds.length) map.fitBounds(bounds,{padding:[70,70],maxZoom:13});
+  else map.setView([18.95,-72.6],8);
+}
+const btnFitNational=document.getElementById('btnFitNational');
+if(btnFitNational) btnFitNational.addEventListener('click',fitNationalView);
+
+function appliquerClasseZoom(){
+  const z=map.getZoom(), el=document.getElementById('map');
+  el.classList.toggle('map-zoom-low',z<=8);
+  el.classList.toggle('map-zoom-mid',z>8&&z<=10);
+  mettreAJourVisibiliteNoms();
+}
+map.on('zoomend',appliquerClasseZoom);
+appliquerClasseZoom();
+
+const legendToggle=document.getElementById('legendToggle');
+if(legendToggle) legendToggle.addEventListener('click',()=>{
+  const lg=document.getElementById('mapLegend');
+  const collapsed=lg.classList.toggle('collapsed');
+  legendToggle.textContent=collapsed?'+':'−';
+  legendToggle.title=collapsed?'Déployer':'Réduire';
+});
+const lyProblems=document.getElementById('lyProblems');
+if(lyProblems) lyProblems.addEventListener('change',()=>renderMap(view));
 </script>
 </body>
 </html>
