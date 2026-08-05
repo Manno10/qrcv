@@ -442,6 +442,210 @@ main{
   .scan-actions{grid-template-columns:1fr}
   .btn.stop{min-width:0}
 }
+
+/* ================================================================
+   Mode compact — optimisé pour Samsung Galaxy A51 (412 × 914 px)
+   ================================================================ */
+@media (max-width: 480px){
+  body{overflow-x:hidden}
+  header{position:sticky;top:0}
+  .header-main{
+    padding:9px 10px 7px;
+    gap:8px
+  }
+  .logo{
+    width:36px;
+    height:36px;
+    border-radius:10px;
+    font-size:.76rem
+  }
+  .title{font-size:.91rem;line-height:1.08}
+  .subtitle{font-size:.61rem}
+  .network{
+    font-size:.62rem;
+    padding:6px 8px
+  }
+
+  .status-strip{
+    padding:0 10px 8px;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:5px
+  }
+  .status-chip{
+    padding:6px 7px;
+    border-radius:9px;
+    font-size:.58rem;
+    gap:5px
+  }
+  .dot{width:7px;height:7px}
+
+  main{
+    width:100%;
+    max-width:430px;
+    padding:9px;
+    gap:9px
+  }
+  .card{
+    border-radius:15px;
+    padding:11px;
+    box-shadow:0 7px 20px rgba(15,39,66,.09)
+  }
+  .section-title{
+    font-size:.66rem;
+    margin-bottom:7px;
+    letter-spacing:.075em
+  }
+  .instruction{
+    font-size:.78rem;
+    line-height:1.34;
+    margin-bottom:9px
+  }
+
+  .phase-grid{gap:7px}
+  .phase-card{
+    min-height:105px;
+    border-radius:13px;
+    padding:10px 8px
+  }
+  .phase-card .radio{
+    width:21px;
+    height:21px;
+    right:7px;
+    top:7px;
+    font-size:.7rem
+  }
+  .phase-card .icon{font-size:1.45rem}
+  .phase-card .name{
+    font-size:.88rem;
+    margin-top:4px
+  }
+  .phase-card .desc{
+    font-size:.63rem;
+    line-height:1.22;
+    margin-top:3px
+  }
+
+  .phase-banner{
+    border-radius:12px;
+    padding:9px 10px;
+    gap:8px
+  }
+  .phase-banner .b-icon{font-size:1.12rem}
+  .phase-banner .b-title{font-size:.78rem}
+  .phase-banner .b-desc{font-size:.64rem}
+
+  .scan-summary{
+    border-radius:12px;
+    padding:9px
+  }
+  .scan-summary h4{
+    margin:0 0 7px;
+    font-size:.73rem
+  }
+  .summary-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:5px
+  }
+  .summary-item{
+    border-radius:9px;
+    padding:6px
+  }
+  .summary-item small{font-size:.57rem}
+  .summary-item b{font-size:.66rem}
+
+  #reader{
+    min-height:195px;
+    max-height:220px;
+    border-radius:13px
+  }
+  .gps-panel{
+    margin-top:8px;
+    padding:8px 9px;
+    border-radius:10px;
+    gap:7px
+  }
+  .gps-panel .gps-dot{
+    width:8px;height:8px;margin-top:4px
+  }
+  .gps-label{font-size:.6rem}
+  .gps-value{font-size:.7rem}
+
+  .scan-actions{
+    margin-top:8px;
+    grid-template-columns:1fr 78px;
+    gap:7px
+  }
+  .btn{
+    border-radius:11px;
+    padding:11px 10px;
+    font-size:.77rem
+  }
+  .btn.stop{min-width:0}
+
+  .sync-card{gap:8px}
+  .sync-head h3{font-size:.75rem}
+  .sync-note{font-size:.59rem}
+  .sync-stats{gap:5px}
+  .sync-stat{
+    padding:7px 5px;
+    border-radius:9px
+  }
+  .sync-stat b{font-size:1rem}
+  .sync-stat span{font-size:.56rem}
+
+  .queue-list{
+    max-height:145px;
+    display:none
+  }
+  .queue-list.open{display:block}
+  .queue-item{
+    padding:7px 0;
+    font-size:.68rem
+  }
+  .badge{
+    font-size:.54rem;
+    padding:4px 5px
+  }
+  .q-code{font-size:.68rem}
+  .q-sub,.q-meta{font-size:.56rem}
+
+  .history-toggle{
+    width:100%;
+    border:1px solid var(--line);
+    background:#F8FAFC;
+    color:var(--navy);
+    border-radius:9px;
+    padding:8px;
+    font-size:.66rem;
+    font-weight:900
+  }
+
+  .install-card{
+    padding:9px 10px;
+    border-radius:12px
+  }
+  .install-copy h3{font-size:.72rem}
+  .install-copy p{font-size:.6rem}
+  .install-btn{
+    padding:9px 10px;
+    font-size:.68rem
+  }
+
+  .modal{padding:15px;border-radius:17px}
+  .modal-icon{font-size:1.6rem}
+  .modal h2{font-size:.98rem}
+  .modal p{font-size:.72rem}
+  .modal-details{gap:5px}
+  .modal-details div{
+    padding:7px;
+    font-size:.63rem
+  }
+
+  .success-check{width:68px;height:68px;font-size:2.3rem}
+  .success-overlay h2{font-size:1.2rem}
+  .success-overlay p{font-size:.78rem}
+}
+
 </style>
 </head>
 
@@ -578,6 +782,9 @@ main{
       <div class="sync-stat"><b id="countConfirmed">0</b><span>Confirmés</span></div>
     </div>
 
+    <button id="historyToggle" class="history-toggle" type="button" onclick="toggleHistory()">
+      Afficher les derniers scans
+    </button>
     <div id="queueList" class="queue-list"></div>
   </section>
 </main>
@@ -805,7 +1012,7 @@ function startScan(){
 
   scanner.start(
     {facingMode:'environment'},
-    {fps:10,qrbox:{width:220,height:220}},
+    {fps:10,qrbox:{width:Math.min(190,window.innerWidth-80),height:Math.min(190,window.innerWidth-80)}},
     onQR,
     ()=>{}
   )
@@ -1153,6 +1360,18 @@ async function renderQueue(){
       </div>
     `;
   }).join('');
+}
+
+
+function toggleHistory(){
+  const liste=document.getElementById('queueList');
+  const bouton=document.getElementById('historyToggle');
+  const ouvert=liste.classList.toggle('open');
+
+  bouton.textContent=
+    ouvert
+      ? 'Masquer les derniers scans'
+      : 'Afficher les derniers scans';
 }
 
 function updateSyncState(mode,text){
