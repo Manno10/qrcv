@@ -1,8 +1,7 @@
 {
-  "id": "./",
-  "name": "Scan ELMS — Départ et arrivée",
-  "short_name": "Scan ELMS",
-  "description": "Scan QR des kits électoraux avec géolocalisation, départ de la base et arrivée au centre de vote.",
+  "name": "ELMS — Scan des kits électoraux",
+  "short_name": "ELMS Scan",
+  "description": "Scan hors connexion des départs et livraisons de kits électoraux avec coordonnées GPS figées au moment du scan.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -10,27 +9,27 @@
     "standalone",
     "minimal-ui"
   ],
-  "orientation": "portrait",
   "background_color": "#F3F6FA",
   "theme_color": "#0F2742",
+  "orientation": "portrait",
+  "lang": "fr",
+  "categories": [
+    "business",
+    "productivity",
+    "utilities"
+  ],
   "icons": [
     {
-      "src": "./icon-192.png",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
-      "src": "./icon-512.png",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "./icon-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ]
 }
