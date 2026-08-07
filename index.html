@@ -773,6 +773,7 @@ main{
       <div>
         <h3>Synchronisation automatique</h3>
         <div class="sync-note">Aucune action n’est requise de la part de l’utilisateur.</div>
+        <div class="sync-note" id="lastSyncNote" style="margin-top:4px;font-weight:800">Dernière synchro : jamais</div>
       </div>
     </div>
 
@@ -1392,10 +1393,42 @@ async function renderQueue(){
       </div>
     `;
   }).join('');
+
+  refreshLastSync(scans);
 }
 
+/* Affiche « Dernière synchro : il y a X » d'après le scan confirmé le plus récent.
+   Persiste automatiquement : dérivé de confirme_serveur_le stocké en base. */
+function refreshLastSync(scans){
+  const el=document.getElementById('lastSyncNote');
+  if(!el)return;
 
-function toggleHistory(){
+  const confirmes=scans
+    .filter(s=>s.statut_sync==='CONFIRME'&&s.confirme_serveur_le)
+    .map(s=>new Date(s.confirme_serveur_le).getTime())
+    .filter(t=>Number.isFinite(t));
+
+  if(!confirmes.length){
+    el.textContent='Dernière synchro : jamais';
+    el.style.color='#C53A3A';
+    return;
+  }
+
+  const dernier=Math.max(...confirmes);
+  const minutes=Math.floor((Date.now()-dernier)/60000);
+
+  let texte;
+  if(minutes<1)texte="à l'instant";
+  else if(minutes<60)texte=`il y a ${minutes} min`;
+  else{
+    const h=Math.floor(minutes/60);
+    texte=`il y a ${h} h ${minutes%60} min`;
+  }
+
+  el.textContent=`Dernière synchro : ${texte}`;
+  // Alerte visuelle si aucune sync réussie depuis plus de 30 min
+  el.style.color=minutes>30?'#C53A3A':'#14885C';
+}
   const liste=document.getElementById('queueList');
   const bouton=document.getElementById('historyToggle');
   const ouvert=liste.classList.toggle('open');
@@ -1601,6 +1634,11 @@ document.addEventListener('visibilitychange',()=>{
         syncAll();
       }
     },15000);
+
+    // Met à jour l'affichage « il y a X min » même sans nouveau scan
+    setInterval(async()=>{
+      refreshLastSync(await listScans());
+    },60000);
 
     if('serviceWorker'in navigator){
       navigator.serviceWorker
