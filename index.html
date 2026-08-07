@@ -938,19 +938,9 @@ function updateGPSState(ok,text){
 function captureFreshGPS(){
   return new Promise((resolve,reject)=>{
     if(!navigator.geolocation){
-      reject(new Error('GPS indisponible sur cet appareil'));
+      reject(new Error('GPS indisponible'));
       return;
     }
-
-    // Secours : dernier point du watchPosition, s'il a moins de 30 s
-    const fallback=()=>{
-      if(lastPosition &&
-         (Date.now()-new Date(lastPosition.timestamp).getTime())<30000){
-        resolve(lastPosition);
-        return true;
-      }
-      return false;
-    };
 
     navigator.geolocation.getCurrentPosition(
       p=>resolve({
@@ -959,24 +949,20 @@ function captureFreshGPS(){
         acc:Math.round(p.coords.accuracy),
         timestamp:new Date(p.timestamp||Date.now()).toISOString()
       }),
-      ()=>{
-        // Échec du point neuf (fréquent hors ligne) → on retombe sur le watch
-        if(!fallback()){
-          reject(new Error(
-            'Position introuvable. Attends que le point GPS en haut passe au vert, puis réessaie.'
-          ));
-        }
-      },
+      ()=>reject(
+        new Error('Impossible de capturer la position au moment du scan')
+      ),
       {
         enableHighAccuracy:true,
-        maximumAge:15000,
-        timeout:20000
+        maximumAge:0,
+        timeout:25000
       }
     );
   });
 }
 
 function setPhase(value){
+  initAudio();   // débloque le son au premier geste
   phase=value;
 
   document.querySelectorAll('.phase-card').forEach(btn=>{
@@ -1013,6 +999,8 @@ function setPhase(value){
 }
 
 function startScan(){
+  initAudio();   // débloque le son (nécessite un geste utilisateur)
+
   if(!phase){
     showToast(
       'Choisis d’abord DÉPART ou ARRIVÉE.',
@@ -1166,6 +1154,7 @@ async function confirmScan(){
       );
 
     document.getElementById('successOverlay').classList.add('show');
+    feedback('success');   // son + vibration « scan réussi »
 
     setTimeout(()=>{
       document.getElementById('successOverlay').classList.remove('show');
@@ -1175,6 +1164,7 @@ async function confirmScan(){
     syncAll();
 
   }catch(err){
+    feedback('error');     // son + vibration d'échec
     showToast(err.message||String(err),'err');
 
   }finally{
@@ -1439,6 +1429,52 @@ function escapeHTML(value){
   );
 }
 
+/* ---- Retour sonore (fonctionne hors ligne, sans fichier audio) ---- */
+let audioCtx=null;
+
+function initAudio(){
+  if(audioCtx)return;
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(AC)audioCtx=new AC();
+  }catch(_){}
+}
+
+function beep(frequences,duree=0.14,volume=0.28){
+  initAudio();
+  if(!audioCtx)return;
+  if(audioCtx.state==='suspended')audioCtx.resume();
+
+  let debut=audioCtx.currentTime;
+  frequences.forEach(freq=>{
+    const osc=audioCtx.createOscillator();
+    const gain=audioCtx.createGain();
+    osc.type='sine';
+    osc.frequency.value=freq;
+    gain.gain.setValueAtTime(volume,debut);
+    gain.gain.exponentialRampToValueAtTime(0.0001,debut+duree);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(debut);
+    osc.stop(debut+duree);
+    debut+=duree;
+  });
+}
+
+/* Retour combiné son + vibration selon le résultat */
+function feedback(type){
+  if(type==='success'){
+    beep([880,1320]);                 // deux notes montantes = OK
+    if(navigator.vibrate)navigator.vibrate([80,50,80]);
+  }else if(type==='duplicate'){
+    beep([660],0.30);                 // note longue = déjà enregistré
+    if(navigator.vibrate)navigator.vibrate([200]);
+  }else if(type==='error'){
+    beep([300,300,300],0.12);         // notes basses répétées = erreur
+    if(navigator.vibrate)navigator.vibrate([60,40,60,40,60]);
+  }
+}
+
 let toastTimer;
 
 function showToast(message,type=''){
@@ -1529,14 +1565,6 @@ document.addEventListener('visibilitychange',()=>{
 (async function init(){
   try{
     await openDB();
-
-    // Force la demande de permission GPS dès le lancement
-    if(navigator.geolocation){
-      navigator.geolocation.getCurrentPosition(
-        ()=>{},()=>{},{enableHighAccuracy:true,timeout:10000}
-      );
-    }
-
     watchGPS();
     updateNetwork();
     await renderQueue();
