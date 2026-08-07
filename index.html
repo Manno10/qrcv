@@ -963,7 +963,7 @@ function captureFreshGPS(){
 }
 
 function setPhase(value){
-  initAudio();   // débloque le son au premier geste
+  try{initAudio();}catch(_){}   // le son ne doit jamais bloquer la sélection
   phase=value;
 
   document.querySelectorAll('.phase-card').forEach(btn=>{
@@ -1000,7 +1000,7 @@ function setPhase(value){
 }
 
 function startScan(){
-  initAudio();   // débloque le son (nécessite un geste utilisateur)
+  try{initAudio();}catch(_){}   // le son ne doit jamais bloquer le scan
 
   if(!phase){
     showToast(
@@ -1429,6 +1429,8 @@ function refreshLastSync(scans){
   // Alerte visuelle si aucune sync réussie depuis plus de 30 min
   el.style.color=minutes>30?'#C53A3A':'#14885C';
 }
+
+function toggleHistory(){
   const liste=document.getElementById('queueList');
   const bouton=document.getElementById('historyToggle');
   const ouvert=liste.classList.toggle('open');
