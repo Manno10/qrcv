@@ -1115,6 +1115,20 @@ async function confirmScan(){
   try{
     const gps=await captureFreshGPS();
 
+    // Avertissement si précision faible (seuil conformité serveur = 300 m)
+    if(gps.acc>50){
+      feedback('error');
+      const ok=confirm(
+        `Précision GPS faible : ±${gps.acc} m.\n`+
+        `Le point risque d'être hors zone du centre. Enregistrer quand même ?`
+      );
+      if(!ok){
+        btn.disabled=false;
+        btn.textContent='Confirmer';
+        return;
+      }
+    }
+
     const scan={
       scan_id:
         crypto.randomUUID
@@ -1242,7 +1256,13 @@ async function sendOne(scan){
       scan.confirme_serveur_le=
         response.heure_reception||
         new Date().toISOString();
+    }else if(response&&(response.conflict||response.duplicate)){
+      // Erreur DÉFINITIVE : déjà enregistré côté serveur → ne plus renvoyer
+      scan.statut_sync='REJETE';
+      scan.derniere_erreur=
+        response.error||'Déjà enregistré côté serveur';
     }else{
+      // Erreur temporaire : sera renvoyé au prochain cycle
       scan.statut_sync='ERREUR';
       scan.derniere_erreur=
         response&&(response.error||response.message)
@@ -1266,7 +1286,7 @@ async function syncAll(){
 
   try{
     const scans=(await listScans())
-      .filter(scan=>scan.statut_sync!=='CONFIRME')
+      .filter(scan=>!['CONFIRME','REJETE'].includes(scan.statut_sync))
       .sort(
         (a,b)=>
           new Date(a.timestamp)-
@@ -1299,7 +1319,7 @@ async function renderQueue(){
   ).length;
 
   const errors=scans.filter(scan=>
-    scan.statut_sync==='ERREUR'
+    ['ERREUR','REJETE'].includes(scan.statut_sync)
   ).length;
 
   const confirmed=scans.filter(scan=>
@@ -1328,16 +1348,18 @@ async function renderQueue(){
     const cls=
       scan.statut_sync==='CONFIRME'
         ? 'ok'
-        : scan.statut_sync==='ERREUR'
+        : ['ERREUR','REJETE'].includes(scan.statut_sync)
           ? 'err'
           : 'wait';
 
     const label=
       scan.statut_sync==='CONFIRME'
         ? 'CONFIRMÉ'
-        : scan.statut_sync==='ERREUR'
-          ? 'ERREUR'
-          : 'EN ATTENTE';
+        : scan.statut_sync==='REJETE'
+          ? 'REJETÉ'
+          : scan.statut_sync==='ERREUR'
+            ? 'ERREUR'
+            : 'EN ATTENTE';
 
     const date=new Date(scan.timestamp).toLocaleString(
       'fr-HT',
@@ -1357,6 +1379,11 @@ async function renderQueue(){
           <div class="q-sub">
             ${scan.phase==='depart'?'DÉPART':'ARRIVÉE'} · ±${scan.acc} m
           </div>
+          ${
+            scan.derniere_erreur&&['ERREUR','REJETE'].includes(scan.statut_sync)
+              ? `<div class="q-sub" style="color:#C53A3A">${escapeHTML(scan.derniere_erreur)}</div>`
+              : ''
+          }
         </div>
         <div class="q-meta">
           ${date}<br>
