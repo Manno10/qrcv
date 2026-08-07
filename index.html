@@ -938,9 +938,19 @@ function updateGPSState(ok,text){
 function captureFreshGPS(){
   return new Promise((resolve,reject)=>{
     if(!navigator.geolocation){
-      reject(new Error('GPS indisponible'));
+      reject(new Error('GPS indisponible sur cet appareil'));
       return;
     }
+
+    // Secours : dernier point du watchPosition, s'il a moins de 30 s
+    const fallback=()=>{
+      if(lastPosition &&
+         (Date.now()-new Date(lastPosition.timestamp).getTime())<30000){
+        resolve(lastPosition);
+        return true;
+      }
+      return false;
+    };
 
     navigator.geolocation.getCurrentPosition(
       p=>resolve({
@@ -949,13 +959,18 @@ function captureFreshGPS(){
         acc:Math.round(p.coords.accuracy),
         timestamp:new Date(p.timestamp||Date.now()).toISOString()
       }),
-      ()=>reject(
-        new Error('Impossible de capturer la position au moment du scan')
-      ),
+      ()=>{
+        // Échec du point neuf (fréquent hors ligne) → on retombe sur le watch
+        if(!fallback()){
+          reject(new Error(
+            'Position introuvable. Attends que le point GPS en haut passe au vert, puis réessaie.'
+          ));
+        }
+      },
       {
         enableHighAccuracy:true,
-        maximumAge:0,
-        timeout:25000
+        maximumAge:15000,
+        timeout:20000
       }
     );
   });
@@ -1514,6 +1529,14 @@ document.addEventListener('visibilitychange',()=>{
 (async function init(){
   try{
     await openDB();
+
+    // Force la demande de permission GPS dès le lancement
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(
+        ()=>{},()=>{},{enableHighAccuracy:true,timeout:10000}
+      );
+    }
+
     watchGPS();
     updateNetwork();
     await renderQueue();

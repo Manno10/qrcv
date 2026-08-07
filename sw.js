@@ -1,4 +1,4 @@
-const CACHE_NAME = 'elms-professionnel-v4';
+const CACHE_NAME = 'elms-professionnel-v5';
 const APP_SHELL = [
   './',
   './index.html',
@@ -37,6 +37,14 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
+  const url = new URL(event.request.url);
+
+  // Ne jamais mettre en cache / intercepter les appels vers Apps Script (JSONP de sync)
+  if (url.hostname.includes('script.google.com') ||
+      url.hostname.includes('googleusercontent.com')) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(cached => {
       const network = fetch(event.request)
@@ -47,7 +55,13 @@ self.addEventListener('fetch', event => {
           });
           return response;
         })
-        .catch(() => cached || caches.match('./index.html'));
+        .catch(() => {
+          // Secours index.html uniquement pour la navigation (ouverture de page)
+          if (event.request.mode === 'navigate') {
+            return caches.match('./index.html');
+          }
+          return cached;
+        });
 
       return cached || network;
     })
